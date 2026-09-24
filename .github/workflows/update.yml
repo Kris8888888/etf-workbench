@@ -5,6 +5,11 @@ on:
     # UTC 09:30 = 北京 17:30，周一到周五。腾讯日线收盘后一两小时内各节点才出齐。
     - cron: '30 9 * * 1-5'
   workflow_dispatch:
+    inputs:
+      replay:
+        description: '填数字 N = 只做回放校验：砍掉最近 N 个交易日重拉对比，不改 data.js。留空 = 正常更新'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -21,9 +26,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      - name: 回放校验（手动触发且填了 N 时）
+        if: inputs.replay != ''
+        run: node _src/test_update.js ${{ inputs.replay }}
       - name: 拉取腾讯增量并还原分红
+        if: inputs.replay == ''
         run: node update.js
       - name: 有变化就提交
+        if: inputs.replay == ''
         run: |
           if git diff --quiet -- data.js; then
             echo "no change"; exit 0
