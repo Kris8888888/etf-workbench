@@ -6,21 +6,24 @@ const CASH = '__CASH__';
 /* ── 参数 ────────────────────────────────────────────────────── */
 const P = {
   pool:['510880','159915','513100','518880'],
-  w:{trend:100, mom:0, rs:0, lowvol:0, rev:0},
-  win:{trend:25, mom:60, vol:20, rev:5},
+  w:{trend:100, mom:0, rs:0, lowvol:0, rev:0, eff:0},
+  win:{trend:25, mom:60, vol:20, rev:5, eff:20},
+  combine:'z',
   topK:1, freq:'D', nDays:20,
   absOn:false, absThresh:0, buffer:0,
   costBps:5, cashRate:1.5, exec:'next',
   awShare:0, awPool:['510300','511010','518880'], awMode:'rp', awFreq:'M', awVol:60,
-  maWin:0, volTarget:0, volTgtWin:20, ddBrake:0, minHold:0, corrCap:0, corrWin:60,
+  maWin:0, volTarget:0, volTgtWin:20, ddBrake:0, minHold:0, forceSellRank:0, corrCap:0, corrWin:60,
   tuShare:0, tuIn:20, tuOut:10, tuAtr:20, tuStop:2, tuRisk:0.5,
   switchGap:0, leverMax:100, marginRate:6,
   start:'2015-01-01', end:CAL[CAL.length-1].replace(/(\d{4})(\d\d)(\d\d)/,'$1-$2-$3'),
   bench:'510300', logY:true
 };
 const AW0={awShare:0, awPool:['510300','511010','518880'], awMode:'rp', awFreq:'M', awVol:60};
-const RK0={maWin:0, volTarget:0, volTgtWin:20, ddBrake:0, minHold:0, corrCap:0, corrWin:60,
+const RK0={maWin:0, volTarget:0, volTgtWin:20, ddBrake:0, minHold:0, forceSellRank:0, corrCap:0, corrWin:60,
            switchGap:0, leverMax:100, marginRate:6};
+// 老预设的 w / win 里没有 eff，套用后补齐默认值，滑块和引擎才不会拿到 undefined
+function fillP(){ P.w.eff??=0; P.win.eff??=20; P.combine??='z'; P.forceSellRank??=0; }
 const TU0={tuShare:0, tuIn:20, tuOut:10, tuAtr:20, tuStop:2, tuRisk:0.5};
 const PRESETS = [
   {g:'复现与改进'},
@@ -40,6 +43,32 @@ const PRESETS = [
    p:{pool:['510880','159915','513100','518880'], w:{trend:100,mom:0,rs:0,lowvol:0,rev:0},
       win:{trend:25,mom:60,vol:20,rev:5}, topK:1, freq:'D', nDays:20,
       absOn:false, absThresh:0, buffer:0, costBps:5, cashRate:1.5, exec:'next', ...AW0, ...RK0, ...TU0}},
+
+  {n:'第三篇·双动量', d:'斜率动量排名 50% ＋ 效率动量排名 50%，综合排名第一的那只 · 当日收盘 · 不计成本',
+   ex:{q:'第三篇文章（2025-12-25）问：斜率动量稳但钝、效率动量灵但碎，非要二选一吗？作者的答案是把两个排名加权合成。',
+       h:'效率动量 = 20 日涨跌幅 × 效率系数。效率系数是考夫曼自适应均线里的概念，等于「位移 ÷ 路程」：单边直上接近 1，来回震荡接近 0。每天给池内每只 ETF 分别算斜率动量名次和效率动量名次，两个名次各 50% 加起来，综合名次最小的那只全仓持有。合成方式在「因子」组里切到「排名合成」，这就是它跟 z 分加权的区别：只看名次，不看差多少。',
+       c:'文章给的是年化 35.49%、回撤 27.84%、11 年开平仓 277 次。四只标的两个名次相加很容易打平（1+2 对 2+1），文章源码在付费社群拿不到，这里同名次先留在手的、再看 z 分谁高，换手比文章少，收益略低。回撤依旧三成上下 —— 双动量没有改变全仓押一只的性质。'},
+   p:{pool:['510880','159915','513100','518880'], w:{trend:50,mom:0,rs:0,lowvol:0,rev:0,eff:50},
+      win:{trend:25,mom:60,vol:20,rev:5,eff:20}, combine:'rank', topK:1, freq:'D', nDays:20,
+      absOn:false, absThresh:0, buffer:0, costBps:0, cashRate:1.5, exec:'same', ...AW0, ...RK0, ...TU0}},
+
+  {n:'第三篇·双动量＋冷却期', d:'同上，买进至少持 3 个交易日；综合排名跌到第 3 名就不等了',
+   ex:{q:'双动量比纯效率动量少换了两成手，但每天都可能换仓，震荡期还是来回打脸。群友建议加个冷却期。',
+       h:'两道配套：「最小持有期」3 个交易日，没到期不卖；「冷却期强制卖出」设为第 3 名，在手的综合排名跌到第 3 或更差时，即使没持满 3 天也立刻换掉。文章原参数就是 3 和 3。',
+       c:'文章给的是年化 32.47%、回撤 26.49%、235 次，比不加冷却期少赚 3 个点。我这边的数据上冷却期反而略有帮助，说明这 2~3 个点本来就在噪音范围里。别把这套参数的收益差当规律。'},
+   p:{pool:['510880','159915','513100','518880'], w:{trend:50,mom:0,rs:0,lowvol:0,rev:0,eff:50},
+      win:{trend:25,mom:60,vol:20,rev:5,eff:20}, combine:'rank', topK:1, freq:'D', nDays:20,
+      absOn:false, absThresh:0, buffer:0, costBps:0, cashRate:1.5, exec:'same', ...AW0, ...RK0, ...TU0,
+      minHold:3, forceSellRank:3}},
+
+  {n:'双动量＋真实摩擦', d:'冷却期版改成次日收盘成交＋单边 5bp，这是双动量诚实的基线',
+   ex:{q:'上面两套跟文章一样按当日收盘价成交、不计成本，实盘做不到。',
+       h:'规则不变，只换执行口径：当日收盘算信号、次日收盘成交，按换手金额收单边 5bp。',
+       c:'跟纯斜率版的「原文＋真实摩擦」放一起比：双动量多赚 2~3 个点，换手接近，回撤没有改善。它是纯斜率版的一个略好的替代，不是另一种风险特征。'},
+   p:{pool:['510880','159915','513100','518880'], w:{trend:50,mom:0,rs:0,lowvol:0,rev:0,eff:50},
+      win:{trend:25,mom:60,vol:20,rev:5,eff:20}, combine:'rank', topK:1, freq:'D', nDays:20,
+      absOn:false, absThresh:0, buffer:0, costBps:5, cashRate:1.5, exec:'next', ...AW0, ...RK0, ...TU0,
+      minHold:3, forceSellRank:3}},
 
   {n:'第二篇·降回撤版', d:'同样四只池、同样趋势得分，加「换仓得分阈值」和「波动降仓」，不融资',
    ex:{q:'第二篇文章（WWY 版）指出：原版基本是「全仓＋第一名切换」，排名一变就换，且不管市场颠不颠仓位都拉满。',
@@ -217,12 +246,13 @@ function backtest(p){
   // 2. 权重归一（先算，才知道哪些因子真要算、要留多长的预热期）
   let wsum=0; for(const k in p.w) wsum+=p.w[k];
   const wn = wsum>0 ? Object.fromEntries(Object.entries(p.w).map(([k,v])=>[k,v/wsum]))
-                    : {trend:1,mom:0,rs:0,lowvol:0,rev:0};
+                    : {trend:1,mom:0,rs:0,lowvol:0,rev:0,eff:0};
   const W=p.win;
+  const Weff=W.eff||20;
   const use={trend: wn.trend>0 || p.absOn, mom: wn.mom>0 || wn.rs>0,
-             vol: wn.lowvol>0 || wn.rs>0, rev: wn.rev>0};
-  if(!use.trend && !use.mom && !use.vol && !use.rev) use.trend=true;
-  const maxW=Math.max(use.trend?W.trend:1, use.mom?W.mom+1:1, use.vol?W.vol+1:1, use.rev?W.rev+1:1,
+             vol: wn.lowvol>0 || wn.rs>0, rev: wn.rev>0, eff: (wn.eff||0)>0};
+  if(!use.trend && !use.mom && !use.vol && !use.rev && !use.eff) use.trend=true;
+  const maxW=Math.max(use.trend?W.trend:1, use.mom?W.mom+1:1, use.vol?W.vol+1:1, use.rev?W.rev+1:1, use.eff?Weff+1:1,
                       (awOn && p.awMode==='rp') ? p.awVol+1 : 1,
                       p.maWin>0 ? p.maWin : 1, p.corrCap>0 ? p.corrWin+1 : 1,
                       tuOn ? Math.max(p.tuIn, p.tuOut, p.tuAtr)+1 : 1);
@@ -231,9 +261,12 @@ function backtest(p){
   const F={};
   for(const c of codes){
     const a=px[c], r=ret[c];
-    const trend=new Array(M).fill(NaN), mom=[...trend], vol=[...trend], rs=[...trend], rev=[...trend];
+    const trend=new Array(M).fill(NaN), mom=[...trend], vol=[...trend], rs=[...trend], rev=[...trend], eff=[...trend];
     for(let t=0;t<M;t++){
       if(use.trend && has(c,t,W.trend)) trend[t]=regScore(a,t,W.trend);
+      // 效率动量 = 区间涨跌幅 × 效率系数(位移÷路程)。单边直上系数接近 1，来回震荡接近 0
+      if(use.eff && has(c,t,Weff+1)){ let path=0; for(let k=0;k<Weff;k++) path+=Math.abs(a[t-k]-a[t-k-1]);
+        const er = path>1e-12 ? Math.abs(a[t]-a[t-Weff])/path : 0; eff[t]=(a[t]/a[t-Weff]-1)*er; }
       if(use.mom && has(c,t,W.mom+1)) mom[t]=a[t]/a[t-W.mom]-1;
       if(use.rev && has(c,t,W.rev+1)) rev[t]=-(a[t]/a[t-W.rev]-1);
       if(use.vol && has(c,t,W.vol+1)){ let m=0; for(let k=0;k<W.vol;k++) m+=r[t-k]; m/=W.vol;
@@ -242,7 +275,7 @@ function backtest(p){
         if(has(c,t,W.mom+1)) rs[t]= vol[t]>1e-6 ? mom[t]/vol[t] : 0;
       }
     }
-    F[c]={trend, mom, rs, lowvol:vol.map(v=>-v), rev};
+    F[c]={trend, mom, rs, lowvol:vol.map(v=>-v), rev, eff};
   }
   const score={}, zs={}; for(const c of codes){ score[c]=new Array(M).fill(NaN); zs[c]={}; for(const k in wn) zs[c][k]=new Array(M).fill(NaN); }
   const keys=Object.keys(wn);
@@ -259,10 +292,19 @@ function backtest(p){
       sd=Math.sqrt(sd/v.length);
       live.forEach((c,i)=>{ zs[c][k][t] = sd>1e-12 ? (v[i]-m)/sd : 0; });
     }
+    // 排名合成（第三篇的做法）：每个因子只看名次（1 最好，同分同名次），加权求和，名次和越小越好。
+    // 得分取负数让「越大越好」的约定不变；再加极小的 z 分尾数，让完全打平的名次和有个确定的先后。
+    const rk={};
+    if(p.combine==='rank') for(const k of keys){
+      if(!wn[k]) continue;
+      const live=codes.filter(c=>isFinite(F[c][k][t])).sort((a,b)=>F[b][k][t]-F[a][k][t]);
+      rk[k]={}; live.forEach((c,i)=>{ rk[k][c] = (i>0 && F[c][k][t]===F[live[i-1]][k][t]) ? rk[k][live[i-1]] : i+1; });
+    }
     for(const c of codes){
-      let tot=0, ok=true;
-      for(const k of keys) if(wn[k]){ const z=zs[c][k][t]; if(!isFinite(z)){ ok=false; break; } tot+=wn[k]*z; }
-      score[c][t] = ok ? tot : NaN;
+      let tot=0, rsum=0, ok=true;
+      for(const k of keys) if(wn[k]){ const z=zs[c][k][t]; if(!isFinite(z)){ ok=false; break; } tot+=wn[k]*z;
+        if(p.combine==='rank') rsum+=wn[k]*rk[k][c]; }
+      score[c][t] = !ok ? NaN : (p.combine==='rank' ? -rsum + 1e-6*tot : tot);
     }
   }
 
@@ -316,15 +358,21 @@ function backtest(p){
   // 缓冲带记的是「上期选中的标的」，哪怕那份仓位当时被空仓规则换成了现金
   const decide = t => {
     // 最小持有期：还没到期就原样端着
-    if(lastTgt && p.minHold>0 && (t-heldSince)<p.minHold) return {w:{...lastTgt.w}, pick:lastTgt.pick.slice(), hold:true};
     const rank = codes.filter(c=>isFinite(score[c][t])).sort((a,b)=>score[b][t]-score[a][t]);
+    if(lastTgt && p.minHold>0 && (t-heldSince)<p.minHold){
+      // 冷却期内照旧端着 —— 除非开了「强制卖出排名」且在手的名次已跌到阈值或更差
+      const forced = p.forceSellRank>0 && lastTgt.pick.some(c=>{ const i=rank.indexOf(c); return i<0 || i+1>=p.forceSellRank; });
+      if(!forced) return {w:{...lastTgt.w}, pick:lastTgt.pick.slice(), hold:true};
+    }
     if(!rank.length) return {w:{[CASH]:1}, pick:[]};
     const keepLim = Math.min(rank.length, p.topK + p.buffer);
     // 在手标的的保留条件：排名仍在缓冲带内，或者「挑战者没有明显领先我」
     const bar = rank.length>=p.topK ? score[rank[p.topK-1]][t] : -Infinity;
+    // 排名合成下名次和打平（只差 z 分尾数）视为同分，在手的不换；真正的名次差至少 0.05
+    const gap = p.switchGap>0 ? p.switchGap : (p.combine==='rank' ? 1e-5 : 0);
     const chosen = pick.filter(c=>rank.indexOf(c)>-1 &&
                        (rank.indexOf(c)<keepLim ||
-                        (p.switchGap>0 && bar - score[c][t] <= p.switchGap)))
+                        (gap>0 && bar - score[c][t] <= gap)))
                        .sort((a,b)=>rank.indexOf(a)-rank.indexOf(b))
                        .slice(0, p.topK);
     for(const c of rank){
@@ -596,7 +644,7 @@ function backtest(p){
   const lastT=t1;
   const board=codes.map(c=>({code:c, score:score[c][lastT],
       z:Object.fromEntries(keys.map(k=>[k, zs[c][k][lastT]])),
-      trend:F[c].trend[lastT], mom:F[c].mom[lastT], vol:-F[c].lowvol[lastT]}))
+      trend:F[c].trend[lastT], mom:F[c].mom[lastT], vol:-F[c].lowvol[lastT], eff:F[c].eff[lastT]}))
     .sort((a,b)=>b.score-a.score);
 
   return {dates:dates.slice(t0,t1+1), navS:blend, rotNav:navS, awNav, awOn, awLast, awS, rotS,
