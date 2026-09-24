@@ -1,0 +1,2259 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ETF轮动记录台</title>
+<style>
+/* ── 记录纸调色：淡灰绿纸 + 墨 + 朱红笔迹 ───────────────────────── */
+:root{
+  --paper:#E6E9E4; --paper-2:#EFF1EC; --paper-3:#DDE1DA;
+  --ink:#16252B; --ink-2:#4C5A5B; --ink-3:#7E8A87;
+  --rule:#CBD2C8; --rule-2:#B2BBAF;
+  --strategy:#16252B; --bench:#8A9490; --vermilion:#B3372A; --jade:#2E6B4F;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100;
+  --s5:#e87ba4; --s6:#008300; --s7:#4a3aa7; --s8:#e34948;
+  --sans:"Helvetica Neue","PingFang SC",-apple-system,system-ui,sans-serif;
+  --display:"Futura","Avenir Next","PingFang SC",var(--sans);
+  --num:"Helvetica Neue","PingFang SC",sans-serif;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--paper); color:var(--ink); font-family:var(--sans);
+  font-size:13px; line-height:1.55; -webkit-font-smoothing:antialiased;
+}
+.num{font-family:var(--num); font-variant-numeric:tabular-nums; font-feature-settings:"tnum" 1}
+
+/* ── 骨架 ─────────────────────────────────────────────────────── */
+.shell{max-width:1560px; margin:0 auto; padding:0 clamp(14px,3vw,34px) 90px}
+.faceplate{
+  display:flex; flex-wrap:wrap; align-items:flex-end; gap:28px 40px;
+  padding:30px 0 20px; border-bottom:2px solid var(--ink);
+}
+.mark{flex:1 1 260px; min-width:230px}
+.mark h1{
+  font-family:var(--display); font-weight:500; font-size:clamp(25px,3.2vw,38px);
+  letter-spacing:.055em; margin:0 0 4px; line-height:1.05;
+}
+.mark p{margin:0; color:var(--ink-2); max-width:38ch; font-size:12.5px}
+
+/* 今日信号 —— 页面的主角之一 */
+.signal{display:flex; align-items:stretch; gap:14px}
+.signal .swatches{display:flex; flex-direction:column; gap:3px; padding-top:3px}
+.signal .swatches i{display:block; width:7px; flex:1; min-height:13px; border-radius:1px}
+.signal .body{min-width:150px}
+.signal .cap{font-size:11px; color:var(--ink-3); letter-spacing:.1em}
+.signal .who{font-family:var(--display); font-size:clamp(21px,2.4vw,29px); letter-spacing:.03em; line-height:1.2}
+.signal .who span{display:block}
+.signal .meta{font-size:11.5px; color:var(--ink-2); margin-top:2px}
+
+.headstats{display:flex; gap:26px; flex-wrap:wrap}
+.headstats div{min-width:74px}
+.headstats dt{font-size:11px; color:var(--ink-3); margin:0}
+.headstats dd{margin:1px 0 0; font-size:20px; letter-spacing:-.01em}
+
+.layout{display:grid; grid-template-columns:288px minmax(0,1fr); gap:clamp(20px,2.6vw,40px); padding-top:22px}
+@media (max-width:1000px){.layout{grid-template-columns:1fr}}
+
+/* ── 控制台 ───────────────────────────────────────────────────── */
+.rail{align-self:start; position:sticky; top:14px; max-height:calc(100vh - 28px); overflow-y:auto; padding-right:8px}
+@media (max-width:1000px){.rail{position:static; max-height:none; overflow:visible}}
+.rail::-webkit-scrollbar{width:7px}
+.rail::-webkit-scrollbar-thumb{background:var(--rule-2); border-radius:4px}
+
+.grp{border-top:1px solid var(--rule-2)}
+.grp:first-of-type{border-top:none}
+.grp > summary{
+  list-style:none; cursor:pointer; position:relative;
+  display:flex; align-items:baseline; gap:10px; padding:11px 0 11px 15px;
+}
+.grp > summary::-webkit-details-marker{display:none}
+.grp > summary::before{
+  content:''; position:absolute; left:2px; top:15px; width:5px; height:5px;
+  border-right:1.5px solid var(--ink-3); border-bottom:1.5px solid var(--ink-3);
+  transform:rotate(-45deg); transition:transform .12s ease;
+}
+.grp[open] > summary::before{transform:rotate(45deg); top:13px}
+.grp > summary:hover::before{border-color:var(--ink)}
+.grp > summary b{
+  font-family:var(--display); font-size:12px; letter-spacing:.14em; font-weight:500; color:var(--ink);
+}
+.grp > summary:focus-visible{outline:2px solid var(--vermilion); outline-offset:-2px}
+.gs{
+  flex:1; min-width:0; text-align:right; font-size:10.5px; color:var(--ink-3);
+  font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.grp[open] .gs{visibility:hidden}
+.gb{padding:0 0 16px 15px}
+.subh{font-family:var(--display); font-size:11px; letter-spacing:.12em; font-weight:500;
+  color:var(--ink-2); margin:16px 0 9px; padding-top:11px; border-top:1px solid var(--rule)}
+.railsec{font-size:10.5px; color:var(--ink-3); margin:0; padding:15px 0 3px; border-top:1px solid var(--rule-2)}
+.railfoot{border-top:1px solid var(--rule-2); margin:0; padding:13px 0 0}
+.hint{font-size:11px; color:var(--ink-3); margin:-4px 0 9px; line-height:1.5}
+
+/* 标的池 */
+.poolg{font-size:10px; color:var(--ink-3); letter-spacing:.12em; margin:11px 0 3px; padding-bottom:2px; border-bottom:1px solid var(--rule)}
+.poolg:first-child{margin-top:0}
+.pool{display:flex; flex-direction:column; gap:1px}
+.pick{
+  display:grid; grid-template-columns:9px 1fr auto; align-items:center; gap:9px;
+  padding:4px 5px 4px 4px; cursor:pointer; border-radius:2px;
+}
+.pick:hover{background:var(--paper-2)}
+.pick input{position:absolute; opacity:0; pointer-events:none}
+.pick .dot{width:9px; height:9px; border-radius:1px; background:var(--rule-2); box-shadow:inset 0 0 0 0 var(--paper)}
+.pick.on .dot{box-shadow:none}
+.pick .nm{font-size:12.5px; color:var(--ink-3)}
+.pick.on .nm{color:var(--ink)}
+.pick .nm em{font-style:normal; color:var(--ink-3); font-size:11px; margin-left:5px}
+.pick .yr{font-size:10.5px; color:var(--ink-3); font-variant-numeric:tabular-nums}
+.pick.off-limit{opacity:.45}
+
+/* 滑块 */
+.sld{margin:0 0 11px}
+.sld .top{display:flex; justify-content:space-between; align-items:baseline; gap:8px}
+.sld .lbl{font-size:12.5px}
+.sld .lbl b{font-weight:500}
+.sld .val{font-size:12px; color:var(--ink-2); font-variant-numeric:tabular-nums}
+.sld .sub{font-size:10.5px; color:var(--ink-3); margin-top:-1px}
+input[type=range]{
+  -webkit-appearance:none; appearance:none; width:100%; height:16px; margin:3px 0 0;
+  background:transparent; cursor:ew-resize;
+}
+input[type=range]::-webkit-slider-runnable-track{height:2px; background:var(--rule-2)}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none; width:12px; height:12px; margin-top:-5px; border-radius:50%;
+  background:var(--paper-2); border:2px solid var(--ink);
+}
+input[type=range]::-moz-range-track{height:2px; background:var(--rule-2)}
+input[type=range]::-moz-range-thumb{
+  width:11px; height:11px; border-radius:50%; background:var(--paper-2); border:2px solid var(--ink);
+}
+input[type=range]:focus-visible::-webkit-slider-thumb{outline:2px solid var(--vermilion); outline-offset:2px}
+input[type=range]:focus-visible::-moz-range-thumb{outline:2px solid var(--vermilion); outline-offset:2px}
+.wbar{height:3px; background:var(--rule); margin-top:5px}
+.wbar i{display:block; height:100%; background:var(--ink)}
+
+/* 分段 / 输入 */
+.seg{display:flex; border:1px solid var(--rule-2); border-radius:2px; overflow:hidden; margin-top:4px}
+.seg button{
+  flex:1; appearance:none; border:0; border-left:1px solid var(--rule-2); background:transparent;
+  font:inherit; font-size:12px; padding:5px 2px; cursor:pointer; color:var(--ink-2);
+}
+.seg button:first-child{border-left:0}
+.seg button[aria-pressed=true]{background:var(--ink); color:var(--paper-2)}
+.seg button:focus-visible{outline:2px solid var(--vermilion); outline-offset:-2px}
+
+.row{display:flex; gap:9px; align-items:flex-end; margin-bottom:11px}
+.fld{flex:1; min-width:0}
+.fld label{display:block; font-size:12.5px; margin-bottom:3px}
+.fld input[type=date], .fld input[type=number], .fld select{
+  width:100%; font:inherit; font-size:12.5px; padding:4px 6px; color:var(--ink);
+  background:var(--paper-2); border:1px solid var(--rule-2); border-radius:2px;
+  font-variant-numeric:tabular-nums;
+}
+.fld select{cursor:pointer}
+.fld input:focus-visible, .fld select:focus-visible{outline:2px solid var(--vermilion); outline-offset:0}
+
+.chk{display:flex; align-items:flex-start; gap:8px; font-size:12.5px; margin:0 0 8px; cursor:pointer}
+.chk input{margin:3px 0 0; accent-color:var(--ink)}
+.chk span small{display:block; color:var(--ink-3); font-size:10.5px; line-height:1.45}
+
+.chips{display:flex; flex-wrap:wrap; gap:4px; margin:0 0 10px}
+.chips button{
+  appearance:none; border:1px solid var(--rule-2); background:transparent; border-radius:11px;
+  padding:2px 9px; font:inherit; font-size:11.5px; cursor:pointer; color:var(--ink-2);
+}
+.chips button:hover{border-color:var(--ink); color:var(--ink)}
+.chips button[aria-pressed=true]{background:var(--ink); border-color:var(--ink); color:var(--paper-2)}
+.chips button:focus-visible{outline:2px solid var(--vermilion); outline-offset:1px}
+.plist{margin:0 -4px}
+.pgrp{font-size:10px; color:var(--ink-3); letter-spacing:.12em; padding:11px 5px 3px; border-top:1px solid var(--rule-2)}
+.pgrp:first-of-type{border-top:0; padding-top:2px}
+.phead{display:flex; font-size:10px; color:var(--ink-3); padding:0 5px 3px}
+.phead b{font-weight:400; width:44px; text-align:right}
+.phead b:first-child{flex:1; text-align:left}
+.prow{
+  display:block; width:100%; text-align:left; appearance:none; background:transparent;
+  border:0; border-top:1px solid var(--rule); padding:6px 5px 7px; cursor:pointer; font:inherit;
+}
+.prow:hover{background:var(--paper-2)}
+.prow .l1{display:flex; align-items:baseline}
+.prow .nm{flex:1; font-size:12.5px; color:var(--ink); padding-right:6px}
+.prow .fig{width:44px; text-align:right; font-size:11.5px; color:var(--ink-2); font-variant-numeric:tabular-nums}
+.prow .fig.k{color:var(--ink)}
+.prow .dsc{display:none; font-size:10.5px; color:var(--ink-3); line-height:1.45; margin-top:4px; padding-right:4px}
+.prow[aria-pressed=true]{background:var(--paper-2); box-shadow:inset 2px 0 0 var(--vermilion)}
+.prow[aria-pressed=true] .nm{font-weight:500}
+.prow[aria-pressed=true] .dsc{display:block}
+.prow:focus-visible{outline:2px solid var(--vermilion); outline-offset:-2px}
+.presets{display:flex; flex-direction:column; gap:5px}
+.presets button{
+  appearance:none; text-align:left; background:transparent; border:1px solid var(--rule-2);
+  border-radius:2px; padding:6px 8px; font:inherit; font-size:12px; cursor:pointer; color:var(--ink);
+}
+.presets button:hover{border-color:var(--ink); background:var(--paper-2)}
+.presets button b{font-weight:500}
+.presets button .pstat{display:block; font-size:10.5px; color:var(--ink-2); margin-top:3px; letter-spacing:.01em}
+.presets button:hover .pstat{color:var(--ink)}
+.presets button small{display:block; color:var(--ink-3); font-size:10.5px}
+.txtbtn{
+  appearance:none; background:none; border:0; padding:0; font:inherit; font-size:12px;
+  color:var(--ink-2); border-bottom:1px solid var(--rule-2); cursor:pointer;
+}
+.txtbtn:hover{color:var(--ink); border-color:var(--ink)}
+
+/* ── 主区 ─────────────────────────────────────────────────────── */
+.panel{margin:0 0 34px}
+.panel > header{display:flex; align-items:baseline; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-bottom:9px}
+.panel h2{font-family:var(--display); font-size:13px; letter-spacing:.13em; font-weight:500; margin:0}
+.panel .note{font-size:11.5px; color:var(--ink-3); margin:0}
+.plot{position:relative; background:var(--paper-2); border:1px solid var(--rule-2)}
+.plot svg{display:block; width:100%}
+.brush{position:relative; margin-top:6px; background:var(--paper-2); border:1px solid var(--rule-2); border-top:0}
+.brush svg{display:block; width:100%; cursor:crosshair; touch-action:none}
+.legend{display:flex; flex-wrap:wrap; gap:4px 14px; margin:9px 0 0; font-size:11.5px; align-items:center}
+.legend span, .legend button{display:inline-flex; align-items:center; gap:6px; color:var(--ink-2)}
+.legend button{appearance:none; background:none; border:0; padding:0; font:inherit; cursor:pointer}
+.legend button[aria-pressed=false]{opacity:.36}
+.legend button:hover{color:var(--ink)}
+.legend button:focus-visible{outline:2px solid var(--vermilion); outline-offset:2px}
+.legend i{width:12px; height:3px; flex:none}
+.legend .dash i{background:repeating-linear-gradient(90deg,var(--bench) 0 4px,transparent 4px 7px)}
+.legend .key{color:var(--ink-3)}
+.legend.keys{margin-top:5px; font-size:11px; gap:3px 12px; color:var(--ink-3)}
+.legend.keys button{color:var(--ink-3)}
+.legend.keys button[aria-pressed=true]{color:var(--ink)}
+.legend.keys i{width:9px; height:9px; border-radius:1px}
+.klab{letter-spacing:.06em}
+
+.tip{
+  position:absolute; pointer-events:none; z-index:5; min-width:130px;
+  background:var(--paper); border:1px solid var(--ink); padding:7px 9px;
+  font-size:11.5px; line-height:1.5; opacity:0; transition:opacity .08s;
+}
+.tip.on{opacity:1}
+.tip .d{font-variant-numeric:tabular-nums; color:var(--ink-3); margin-bottom:3px}
+.tip table{border-collapse:collapse; width:100%}
+.tip td{padding:0}
+.tip td:last-child{text-align:right; padding-left:12px; font-variant-numeric:tabular-nums}
+.tip td i{display:inline-block; width:8px; height:8px; margin-right:5px; border-radius:1px}
+
+/* 指标 */
+.stats{display:grid; grid-template-columns:repeat(auto-fit,minmax(112px,1fr)); gap:1px; background:var(--rule-2); border:1px solid var(--rule-2)}
+.stats div{background:var(--paper-2); padding:9px 11px 10px}
+.stats dt{margin:0; font-size:11px; color:var(--ink-3)}
+.stats dd{margin:2px 0 0; font-size:18px; letter-spacing:-.01em; font-variant-numeric:tabular-nums; white-space:nowrap}
+.stats dd small{display:block; font-size:11px; color:var(--ink-3); letter-spacing:0; margin-top:1px}
+
+/* 表 */
+table.data{border-collapse:collapse; width:100%; font-size:12px; font-variant-numeric:tabular-nums}
+table.data th, table.data td{padding:5px 9px; text-align:right; border-bottom:1px solid var(--rule)}
+table.data th:first-child, table.data td:first-child{text-align:left}
+table.data thead th{font-weight:500; color:var(--ink-3); border-bottom:1px solid var(--rule-2); font-size:11px}
+table.data tbody tr:hover{background:var(--paper-2)}
+table.data tfoot td{font-weight:500; border-top:1px solid var(--ink-2); border-bottom:none}
+.pos{color:var(--jade)} .neg{color:var(--vermilion)}
+.tblfold{margin-top:12px; border-top:1px solid var(--rule)}
+.tblfold > summary{
+  list-style:none; cursor:pointer; padding:8px 0 8px 15px; position:relative;
+  font-size:11.5px; color:var(--ink-3);
+}
+.tblfold > summary::-webkit-details-marker{display:none}
+.tblfold > summary::before{
+  content:''; position:absolute; left:2px; top:12px; width:5px; height:5px;
+  border-right:1.5px solid var(--ink-3); border-bottom:1.5px solid var(--ink-3);
+  transform:rotate(-45deg); transition:transform .12s;
+}
+.tblfold[open] > summary::before{transform:rotate(45deg); top:10px}
+.tblfold > summary:hover{color:var(--ink)}
+.tblfold > summary:focus-visible{outline:2px solid var(--vermilion); outline-offset:-2px}
+
+.three{display:grid; grid-template-columns:repeat(auto-fit,minmax(290px,1fr)); gap:clamp(18px,2.2vw,32px)}
+.three .panel{margin-bottom:0}
+
+.nowbar{
+  display:flex; align-items:baseline; gap:12px 16px; flex-wrap:wrap;
+  padding:0 0 13px; margin:0 0 18px; border-bottom:1px solid var(--rule-2);
+}
+.nowbar .nwk{font-size:11px; color:var(--ink-3); letter-spacing:.1em}
+.nowbar .nwn{font-family:var(--display); font-size:17px; letter-spacing:.03em}
+.nowbar .nwd{flex:1; min-width:220px; font-size:12px; color:var(--ink-2); max-width:72ch}
+.nowbar .nwd b{font-weight:500; color:var(--ink)}
+
+.exgrid{background:var(--paper-2); border:1px solid var(--rule-2)}
+.exgrid .exg{
+  margin:0; background:var(--paper); padding:11px 14px 8px;
+  font-family:var(--display); font-size:11px; font-weight:500; letter-spacing:.14em; color:var(--ink-2);
+  border-bottom:1px solid var(--rule-2);
+}
+.excard{border-bottom:1px solid var(--rule)}
+.excard:last-child{border-bottom:0}
+.excard > summary{
+  list-style:none; cursor:pointer; display:flex; align-items:baseline; gap:12px;
+  padding:9px 14px 10px 26px; position:relative;
+}
+.excard > summary::-webkit-details-marker{display:none}
+.excard > summary::before{
+  content:''; position:absolute; left:13px; top:14px; width:5px; height:5px;
+  border-right:1.5px solid var(--ink-3); border-bottom:1.5px solid var(--ink-3);
+  transform:rotate(-45deg); transition:transform .12s ease;
+}
+.excard[open] > summary::before{transform:rotate(45deg); top:12px}
+.excard > summary:hover{background:var(--paper)}
+.excard > summary:focus-visible{outline:2px solid var(--vermilion); outline-offset:-2px}
+.excard[open]{background:var(--paper)}
+.excard[open] > summary{box-shadow:inset 3px 0 0 var(--vermilion)}
+.exnm{flex:1; min-width:0; font-size:13.5px; letter-spacing:.01em}
+.excard[open] .exnm{font-weight:500}
+.extag{font-size:10.5px; color:var(--vermilion); white-space:nowrap}
+.exfig{font-size:11.5px; color:var(--ink-2); font-variant-numeric:tabular-nums; white-space:nowrap}
+.exfig i{font-style:normal; color:var(--ink-3); font-size:9.5px}
+.exb{padding:0 14px 15px 26px; max-width:86ch}
+.exd{margin:0 0 9px; font-size:11.5px; color:var(--ink-3); line-height:1.55}
+.exdl{margin:0; display:grid; grid-template-columns:44px minmax(0,1fr); gap:6px 12px}
+.exdl dt{font-size:11px; color:var(--ink-3); line-height:1.5; padding-top:1px}
+.exdl dd{margin:0; font-size:12.5px; line-height:1.68; color:var(--ink)}
+.exdl dd:last-of-type{color:var(--ink-2)}
+
+.foot{border-top:1px solid var(--rule-2); margin-top:30px; padding-top:14px; font-size:11.5px; color:var(--ink-3); max-width:78ch}
+.foot p{margin:0 0 6px}
+.warn{border-left:2px solid var(--vermilion); padding:6px 0 6px 10px; margin:0 0 14px; font-size:12px; color:var(--ink-2)}
+.warn:empty{display:none}
+
+/* 行情更新状态行 —— 标题下一行安静的小字，只有圆点换色 */
+.feed{display:flex; align-items:center; gap:7px; margin-top:9px; font-size:11.5px; color:var(--ink-3)}
+.feed i{width:6px; height:6px; border-radius:50%; background:var(--rule-2); flex:none}
+.feed[data-state=busy] i{background:var(--ink-3); animation:feedPulse 1.1s ease-in-out infinite}
+.feed[data-state=fresh] i{background:var(--jade)}
+.feed[data-state=fail] i{background:var(--vermilion)}
+.feed span{flex:1 1 auto}
+.feed button{appearance:none; border:0; background:none; padding:0; font:inherit; font-size:11.5px; color:var(--ink-2); text-decoration:underline; text-underline-offset:2px; cursor:pointer; white-space:nowrap; flex:none}
+.feed button:hover{color:var(--ink)}
+.feed button:focus-visible{outline:2px solid var(--vermilion); outline-offset:1px}
+.feed[data-state=busy] button{visibility:hidden}
+@keyframes feedPulse{50%{opacity:.25}}
+@media (prefers-reduced-motion:reduce){*{transition:none !important; animation:none !important}}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <div class="faceplate">
+    <div class="mark">
+      <h1>ETF轮动记录台</h1>
+      <p>在一池ETF里每期只留最强的那几个。左边改权重和区间，右边的净值、回撤、轮动轨迹立刻重算。</p>
+      <p class="feed" id="feed"><i></i><span id="feedText"></span><button type="button" id="feedBtn">重新拉取</button></p>
+    </div>
+    <div class="signal">
+      <div class="swatches" id="sigSwatch"></div>
+      <div class="body">
+        <div class="cap" id="sigCap">最新一期该持有</div>
+        <div class="who num" id="sigWho">—</div>
+        <div class="meta" id="sigMeta"></div>
+      </div>
+    </div>
+    <dl class="headstats num" id="headStats"></dl>
+  </div>
+
+  <div class="layout">
+    <!-- ══ 控制台 ══ -->
+    <form class="rail" id="rail" onsubmit="return false">
+
+      <details class="grp" open>
+        <summary><b>预设方案</b><span class="gs">16 套 · 点一行套用</span></summary>
+        <div class="gb">
+          <p class="hint">右边三个数字是按当前回测区间实测的。</p>
+          <div class="plist" id="presets"></div>
+        </div>
+      </details>
+
+      <details class="grp" open>
+        <summary><b>回测区间</b><span class="gs" id="gsRange"></span></summary>
+        <div class="gb"><div id="range"></div></div>
+      </details>
+
+      <p class="railsec">下面几组是自己调参数用的，平时收着就行</p>
+
+      <details class="grp">
+        <summary><b>标的池</b><span class="gs" id="gsPool"></span></summary>
+        <div class="gb">
+          <p class="hint">同时最多 8 只（图例色位固定）。右侧是可用起始年份，上市晚的标的到期才会进入候选。</p>
+          <div class="pool" id="pool"></div>
+        </div>
+      </details>
+
+      <details class="grp">
+        <summary><b>选股规则</b><span class="gs" id="gsFactor"></span></summary>
+        <div class="gb">
+          <p class="hint">每个因子先做横截面标准化，再按权重相加成总分。权重自动归一，全为 0 时只用趋势。</p>
+          <div id="weights"></div>
+          <h3 class="subh">因子窗口</h3>
+          <div id="windows"></div>
+        </div>
+      </details>
+
+      <details class="grp">
+        <summary><b>持仓与调仓</b><span class="gs" id="gsExec"></span></summary>
+        <div class="gb">
+          <div id="exec1"></div>
+          <h3 class="subh">摩擦与空仓</h3>
+          <div id="exec2"></div>
+        </div>
+      </details>
+
+      <details class="grp">
+        <summary><b>风险控制</b><span class="gs" id="gsRisk"></span></summary>
+        <div class="gb">
+          <p class="hint">在选股之上再加一层。实测最有效的是波动率目标；回撤刹车在这套策略上不划算，留着自己试。</p>
+          <div id="risk"></div>
+        </div>
+      </details>
+
+      <details class="grp">
+        <summary><b>海龟腿</b><span class="gs" id="gsTu"></span></summary>
+        <div class="gb">
+          <p class="hint">唐奇安通道突破：创 N 日新高就买、跌破 M 日新低就走，头寸按 ATR 反比定。标的用上面那个池子。</p>
+          <div id="tuBox"></div>
+        </div>
+      </details>
+
+      <details class="grp">
+        <summary><b>全天候腿</b><span class="gs" id="gsAw"></span></summary>
+        <div class="gb">
+          <p class="hint">把一部分仓位交给风险平价组合（股／债／金按波动倒数配权）。</p>
+          <div id="awBox"></div>
+        </div>
+      </details>
+
+      <p class="railfoot"><button type="button" class="txtbtn" id="copyBtn">复制当前参数与结果</button></p>
+    </form>
+
+    <!-- ══ 主区 ══ -->
+    <main>
+      <div class="nowbar" id="nowBar"></div>
+      <p class="warn" id="warn"></p>
+
+      <section class="panel">
+        <header>
+          <h2>净值与轮动轨迹</h2>
+          <p class="note" id="navNote"></p>
+        </header>
+        <div class="plot" id="navPlot">
+          <svg id="navSvg" role="img" aria-labelledby="navDesc"></svg>
+          <desc id="navDesc">策略与基准的净值曲线，下方色带按颜色标出每一天实际持有的ETF。</desc>
+          <div class="tip" id="navTip"></div>
+        </div>
+        <div class="brush" id="brushWrap">
+          <svg id="brushSvg" role="img" aria-label="全期概览，拖动两端手柄可改回测区间"></svg>
+        </div>
+        <p class="note" style="margin:7px 0 0;font-size:11.5px;color:var(--ink-3)">
+          图例点一下可以关掉那条线；净值图上横向拖一段、或拖下面这条区间条的两端，都能改回测区间，双击净值图回全期。</p>
+        <p class="legend" id="navLegend"></p>
+        <p class="legend keys" id="navKeys"></p>
+      </section>
+
+      <section class="panel">
+        <header><h2>回测指标</h2><p class="note" id="statNote">夏普用现金收益率作无风险利率</p></header>
+        <dl class="stats num" id="stats"></dl>
+      </section>
+
+      <section class="panel">
+        <header>
+          <h2>水下回撤</h2>
+          <p class="note" id="ddNote"></p>
+        </header>
+        <div class="plot" id="ddPlot">
+          <svg id="ddSvg" role="img" aria-label="策略与基准的回撤曲线"></svg>
+          <div class="tip" id="ddTip"></div>
+        </div>
+      </section>
+
+      <div class="three">
+        <section class="panel">
+          <header><h2>最新一期打分</h2><p class="note">总分＝加权z分</p></header>
+          <div class="plot" id="scorePlot" style="background:transparent;border:0">
+            <svg id="scoreSvg" role="img" aria-label="池内各ETF的最新打分排行"></svg>
+            <div class="tip" id="scoreTip"></div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <header><h2>轮动腿持仓占比</h2><p class="note">各标的（含现金）被持有的交易日占比</p></header>
+          <table class="data" id="occTable"></table>
+        </section>
+
+        <section class="panel">
+          <header><h2>池内相关性</h2>
+          <p class="note" id="corrNote"></p></header>
+        <div class="plot" id="corrPlot" style="background:transparent;border:0">
+          <svg id="corrSvg" role="img" aria-label="标的池内两两日收益相关系数矩阵"></svg>
+          <div class="tip" id="corrTip"></div>
+        </div>
+        <p class="note" style="margin:9px 0 0;font-size:11.5px;color:var(--ink-3)">
+          越红越同涨同跌，越蓝越反着走，灰白是几乎不相干。同时持两只深红的，名义上分散了，实际是同一个风险敞口下两注。</p>
+      </section>
+      </div>
+
+      <section class="panel">
+        <header><h2>分年度</h2><p class="note">首尾年份为区间内的不完整年</p></header>
+        <div class="plot" id="yrPlot" style="background:transparent;border:0">
+          <svg id="yrSvg" role="img" aria-label="策略与基准的分年度收益对比"></svg>
+          <div class="tip" id="yrTip"></div>
+        </div>
+        <details class="tblfold">
+          <summary>分年度明细表</summary>
+          <table class="data" id="yrTable"></table>
+        </details>
+      </section>
+
+      <section class="panel" id="explainPanel">
+        <header>
+          <h2>每套方案，逐个说清</h2>
+          <p class="note">正文里的具体数字都是 2015-01 至 2026-09 全期实测；每张卡上那行数字会随你选的回测区间变</p>
+        </header>
+        <div class="exgrid" id="explain"></div>
+      </section>
+
+      <div class="foot">
+        <p>行情取自腾讯，覆盖至 <b id="dataEnd"></b>。券商给的「前复权／后复权」价对ETF分红都是直接加减现金、不算再投资，前者会高估收益、后者会低估，所以这里改用不复权价加还原出来的每次分红，重算成真正的含分红再投净值 —— 沪深300ETF由此比沪深300指数每年多1.88%，与另一次独立还原（+1.85%）对得上。中证500ETF、中证1000ETF、恒生ETF的分红识别得偏少，它们的收益是略微保守的。</p>
+        <p>回测把当日收盘价当作可成交价，实际尾盘挂单会有偏差；没有计印花税、场内溢价和停牌无法成交。候选池是这类策略里最主观的部分，池子换了结论就换，趋势窗口超过40天时几套参数全线失效 —— 历史上有效不代表以后有效。这是研究工具，不是投资建议。</p>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="data.js"></script>
+<script src="update.js"></script>
+<script>
+/* 仓库里的 data.js 是基线；浏览器上次从腾讯补拉的几天存在 localStorage，开页先接上再启动 */
+(function(){
+  const D=globalThis.ETF_DATA; if(!D) return;
+  globalThis.ETF_BASE_LAST=D.cal[D.cal.length-1];
+  try{
+    const c=JSON.parse(localStorage.getItem('etf-live-delta-v1')||'null');
+    if(!c || c.base!==globalThis.ETF_BASE_LAST || !c.cal || !c.cal.length) return;
+    if(!D.assets.every(a=>c.px[a.code] && c.px[a.code].length===c.cal.length)) return;
+    D.cal.push(...c.cal);
+    for(const a of D.assets) a.px.push(...c.px[a.code]);
+  }catch(e){}
+})();
+</script>
+<script>
+"use strict";
+const RAW = globalThis.ETF_DATA;
+const CAL = RAW.cal, ASSETS = RAW.assets;
+const SERIES = ['--s1','--s2','--s3','--s4','--s5','--s6','--s7','--s8'].map(v=>
+  getComputedStyle(document.documentElement).getPropertyValue(v).trim());
+const CSS = k => getComputedStyle(document.documentElement).getPropertyValue(k).trim();
+const INK=CSS('--ink'), INK2=CSS('--ink-2'), INK3=CSS('--ink-3'), RULE=CSS('--rule'),
+      RULE2=CSS('--rule-2'), PAPER2=CSS('--paper-2'), PAPER3=CSS('--paper-3'), BENCH=CSS('--bench'),
+      VERM=CSS('--vermilion'), JADE=CSS('--jade');
+const CASH = '__CASH__';
+
+/* ── 参数 ────────────────────────────────────────────────────── */
+const P = {
+  pool:['510880','159915','513100','518880'],
+  w:{trend:100, mom:0, rs:0, lowvol:0, rev:0},
+  win:{trend:25, mom:60, vol:20, rev:5},
+  topK:1, freq:'D', nDays:20,
+  absOn:false, absThresh:0, buffer:0,
+  costBps:5, cashRate:1.5, exec:'next',
+  awShare:0, awPool:['510300','511010','518880'], awMode:'rp', awFreq:'M', awVol:60,
+  maWin:0, volTarget:0, volTgtWin:20, ddBrake:0, minHold:0, corrCap:0, corrWin:60,
+  tuShare:0, tuIn:20, tuOut:10, tuAtr:20, tuStop:2, tuRisk:0.5,
+  switchGap:0, leverMax:100, marginRate:6,
+  start:'2015-01-01', end:CAL[CAL.length-1].replace(/(\d{4})(\d\d)(\d\d)/,'$1-$2-$3'),
+  bench:'510300', logY:true
+};
+const AW0={awShare:0, awPool:['510300','511010','518880'], awMode:'rp', awFreq:'M', awVol:60};
+const RK0={maWin:0, volTarget:0, volTgtWin:20, ddBrake:0, minHold:0, corrCap:0, corrWin:60,
+           switchGap:0, leverMax:100, marginRate:6};
+const TU0={tuShare:0, tuIn:20, tuOut:10, tuAtr:20, tuStop:2, tuRisk:0.5};
+const PRESETS = [
+  {g:'复现与改进'},
+
+  {n:'原文的改进版 2', d:'趋势得分 100% · 25 日窗口 · 只持 1 只 · 每日调仓 · 当日收盘成交 · 不计成本',
+   ex:{q:'原文初版按「最近 N 日涨幅」排序，同样涨 10%，一路走上去和大起大落后涨上去被当成一样强。',
+       h:'把排序规则换成趋势得分：取最近 25 天收盘价，先除以区间首日做归一化（不然不同价位的 ETF 斜率没法比），再对时间做一元线性回归，得分＝斜率 × R² × 10000。斜率管「涨得多快」，R² 管「涨得有多顺」，两者相乘才是又快又顺。每天重排，只留得分最高的一只，四只标的分别代表价值、成长、外盘、商品。',
+       c:'这一套是用来对齐原文数字的，不是拿来实盘的：当日收盘价算信号、同一个收盘价成交，且完全不计佣金和滑点。年化里有一部分是这个口径送的，回撤也在三成上下，全部身家押一只。'},
+   p:{pool:['510880','159915','513100','518880'], w:{trend:100,mom:0,rs:0,lowvol:0,rev:0},
+      win:{trend:25,mom:60,vol:20,rev:5}, topK:1, freq:'D', nDays:20,
+      absOn:false, absThresh:0, buffer:0, costBps:0, cashRate:1.5, exec:'same', ...AW0, ...RK0, ...TU0}},
+
+  {n:'原文＋真实摩擦', d:'同上，改成次日收盘成交＋单边 5bp。摩擦一年吃掉约 2 个点',
+   ex:{q:'上一套的成交假设做不到 —— 收盘价出来的那一刻，收盘已经结束了。',
+       h:'规则一个字不改，只换执行口径：当日收盘算信号、次日收盘成交，并按换手金额收单边 5bp（佣金＋滑点）。',
+       c:'年化被摩擦削掉约 2 个百分点，这就是这套策略诚实的基线。一年换手 15 倍多，回撤三成出头 —— 数字好看，但真金白银拿着的时候，连续几个月净值腰斩的滋味不是人人受得住。'},
+   p:{pool:['510880','159915','513100','518880'], w:{trend:100,mom:0,rs:0,lowvol:0,rev:0},
+      win:{trend:25,mom:60,vol:20,rev:5}, topK:1, freq:'D', nDays:20,
+      absOn:false, absThresh:0, buffer:0, costBps:5, cashRate:1.5, exec:'next', ...AW0, ...RK0, ...TU0}},
+
+  {n:'第二篇·降回撤版', d:'同样四只池、同样趋势得分，加「换仓得分阈值」和「波动降仓」，不融资',
+   ex:{q:'第二篇文章（WWY 版）指出：原版基本是「全仓＋第一名切换」，排名一变就换，且不管市场颠不颠仓位都拉满。',
+       h:'两道减震：① 新第一名必须明显领先在手的才换（得分差阈值，不是排名缓冲）；② 波动高时主动降仓，上限 100%。文章原文是 9:50 执行，这里只能用次日收盘近似。',
+       c:'文章给的是年化 29.09%、回撤 15.80%；我这边用还原后的分红再投数据、次日收盘成交，跑出来收益低一截、回撤高一截。差异主要来自数据口径（聚宽前复权会高估红利 ETF 的收益）和执行时点。'},
+   p:{pool:['518880','513100','159915','510880'], w:{trend:100,mom:0,rs:0,lowvol:0,rev:0},
+      win:{trend:25,mom:60,vol:20,rev:5}, topK:1, freq:'D', nDays:20,
+      absOn:false, absThresh:0, buffer:0, costBps:5, cashRate:1.5, exec:'next', ...AW0, ...RK0, ...TU0,
+      switchGap:0.5, volTarget:16, volTgtWin:20}},
+
+  {n:'第二篇·融资增强版', d:'在降回撤版之上，低波动时允许融资到 2 倍',
+   ex:{q:'降回撤版把回撤砍了一半，但收益也掉了。文章的第三步：不是无脑加杠杆，而是「安静时借一点力」。',
+       h:'把敞口上限从 100% 放到 200%：当实际波动明显低于目标时，目标仓位才会超过 100%；波动一起来就自动收回 1 倍甚至更低。超出部分按 6% 年利率计息。',
+       c:'文章给的是年化 35.71%、回撤 16.79%（只比不融资版高不到 1 个点）。我这边复刻出来杠杆是帮倒忙的 —— 它在平静期加仓，而这个池子的平静期后面常跟着急跌。同一个机制换到「低回撤王」那个底子上才是正收益，见下面那组。'},
+   p:{pool:['518880','513100','159915','510880'], w:{trend:100,mom:0,rs:0,lowvol:0,rev:0},
+      win:{trend:25,mom:60,vol:20,rev:5}, topK:1, freq:'D', nDays:20,
+      absOn:false, absThresh:0, buffer:0, costBps:5, cashRate:1.5, exec:'next', ...AW0, ...RK0, ...TU0,
+      switchGap:0.5, volTarget:16, volTgtWin:20, leverMax:200, marginRate:6}},
+
+  {n:'双持仓＋空仓保护', d:'趋势 80%／低波 20% · 持 2 只 · 缓冲 1 名 · 趋势转负那份走现金',
+   ex:{q:'只持一只的回撤太大，而且四只标的全线下跌时策略还是满仓 —— 它只会挑「跌得最少的」，不会走人。',
+       h:'四件事一起上：① 同时持 2 只各 50%，分掉单只的运气成分；② 打分里掺 20% 低波动因子（年化波动的相反数），同分情况下偏向走得稳的；③ 加 1 名换手缓冲带 —— 在手的标的掉出前 2 名、但仍在前 3 名内就不换，省掉大量在名次边缘反复横跳的无效换手；④ 空仓保护：入选标的的趋势得分转负时，那一份仓位换成现金。',
+       c:'回撤砍掉一半，代价是年化也降了不少。分仓和空仓保护在单边牛市里都会拖后腿 —— 涨得最猛的那只只占一半仓，而空仓保护偶尔会在反弹起点把你踢出场。'},
+   p:{pool:['510880','159915','513100','518880'], w:{trend:80,mom:0,rs:0,lowvol:20,rev:0},
+      win:{trend:25,mom:60,vol:20,rev:5}, topK:2, freq:'D', nDays:20,
+      absOn:true, absThresh:0, buffer:1, costBps:5, cashRate:1.5, exec:'next', ...AW0, ...RK0, ...TU0}},
+
+  {n:'三持仓＋低换手', d:'趋势 65%／低波 35% · 池加国债 · 持 3 只 · 每周调仓 · 年换手降到 4 倍上下',
+   ex:{q:'日频调仓一年换手十几倍，摩擦、盯盘、心态成本都不低；而且池子里没有一个真正的避险去处 —— 股跌的时候只能挑另一只股。',
+       h:'池子里加进国债 ETF 五年，让策略在股票普跌时有地方可去；同时持 3 只各三分之一；低波权重提到 35%；趋势窗口收短到 15 天（周频下反应会变慢，窗口收短来补）；调仓改成每周最后一个交易日。',
+       c:'年换手从十几倍降到四倍出头，回撤和卡玛都更好。代价是周内出事只能等到周末才动，急跌那几天只能干看着。'},
+   p:{pool:['510880','159915','513100','518880','511010'], w:{trend:65,mom:0,rs:0,lowvol:35,rev:0}, win:{trend:15,mom:60,vol:20,rev:5}, topK:3, freq:'W', nDays:10,
+      absOn:false, absThresh:0, buffer:1, costBps:5, cashRate:1.5, exec:'next', ...AW0, ...RK0, ...TU0}},
+
+  {n:'波动目标＋最小持有', d:'在上一套之上加波动率目标 22% 和 5 日最小持有期。纯轮动里卡玛最高的一套',
+   ex:{q:'上一套始终满仓 —— 市场安静的时候满仓，市场开始剧烈晃动的时候也还是满仓。另外周频下仍有一部分换手是「换了又换回来」。',
+       h:'加两层：① 波动率目标 22% —— 每天用组合最近 20 天的实际年化波动跟目标比，超了就按「目标 ÷ 实际」的比例降敞口，降下来的钱拿现金，上限 100%（不加杠杆，只会减仓不会加杠杆）；② 最小持有期 5 天 —— 买进去至少端一周，压掉来回打脸的换手。',
+       c:'两段区间之外还在 2016 起、2019 起分别验过，卡玛都是同类里最高的。但要清楚：波动率目标本质是「事后降仓」，用的是已经发生的波动，急跌第一天照样吃满；实测平均敞口 99%，说明它大部分时间没在起作用，这一套的提升其实主要来自最小持有期。'},
+   p:{pool:['510880','159915','513100','518880','511010'], w:{trend:65,mom:0,rs:0,lowvol:35,rev:0}, win:{trend:15,mom:60,vol:20,rev:5}, topK:3, freq:'W', nDays:10,
+      absOn:false, absThresh:0, buffer:1, costBps:5, cashRate:1.5, exec:'next', ...AW0, ...RK0, ...TU0,
+      volTarget:22, minHold:5}},
+
+  {n:'广池＋分散约束', d:'七只标的（加小盘、港股） · 相关系数超 0.7 的不同时持 · 波动目标 22%',
+   ex:{q:'池子一宽就容易撞上高度相关的两只 —— 创业板和中证1000、纳指和标普500 都是一涨一起涨。名义上持了 3 只、分散了，实际是同一个风险敞口下两注。',
+       h:'池子扩到七只（加中证1000、恒生）；开分散约束 —— 挑第二、第三只时，只要跟已选标的近 60 日相关系数超过 0.7 就跳过，宁可名额空着放现金；配上波动率目标 22%。',
+       c:'回撤是全部方案里最小的，三段区间也最稳。代价是约束经常让仓位凑不满，长期少赚一截；另外池子越宽，「哪只该进池」这个纯主观的选择对结果的影响就越大。'},
+   p:{pool:['510880','159915','513100','518880','511010','512100','159920'],
+      w:{trend:65,mom:0,rs:0,lowvol:35,rev:0}, win:{trend:15,mom:60,vol:20,rev:5}, topK:3, freq:'W', nDays:10, absOn:false, absThresh:0, buffer:1,
+      costBps:5, cashRate:1.5, exec:'next', ...AW0, ...RK0, ...TU0, corrCap:0.7, corrWin:60, volTarget:22}},
+
+  {g:'低回撤优先'},
+
+  {n:'低回撤王（不融资）', d:'核心五只＋豆粕 · 趋势50／低波50 · 持 3 只 · 周频 · 得分差阈值 0.5 · 波动目标 10%',
+   ex:{q:'前面几套的回撤都在一成以上。如果把「回撤尽量小」当第一目标，不加杠杆能做到什么程度？',
+       h:'三处一起改：① 池子里加进豆粕 ETF —— 它跟核心五只的相关系数只有 0.02~0.14，是这个市场上少有的真正独立的品种；② 低波因子权重提到 50%，跟趋势得分平起平坐；③ 换仓改成看得分差（挑战者要领先 0.5 分才换），再叠一层 10% 的波动率目标。',
+       c:'这是全工具不加杠杆时卡玛最高的一套，回撤压到六个多点。代价是年化只有十四个点上下 —— 低波因子权重一半，本质上是主动少赚波动大的那部分钱。'},
+   p:{pool:['510880','159915','513100','518880','511010','159985'], w:{trend:50,mom:0,rs:0,lowvol:50,rev:0}, win:{trend:15,mom:60,vol:20,rev:5}, topK:3, freq:'W', nDays:10,
+      absOn:false, absThresh:0, buffer:1, costBps:5, cashRate:1.5, exec:'next', ...AW0, ...RK0, ...TU0,
+      volTarget:10, volTgtWin:20, minHold:5, switchGap:0.5}},
+
+  {n:'最稳三袖（不融资）', d:'上一套 70%＋海龟 30%，波动目标 8%。全工具回撤最小、卡玛最高',
+   ex:{q:'低回撤王已经很稳，但单一逻辑总有失灵的时候。',
+       h:'在低回撤王的基础上分 30% 仓位给海龟腿（破 20 日新高进、破 10 日新低出），每月末重置比例；波动率目标收到 8%。',
+       c:'回撤只剩四个多点，卡玛 2.5 上下，是全工具最高的。但年化也压到了十一二个点 —— 这套的定位是「几乎不会让你难受」，不是「赚得多」。'},
+   p:{pool:['510880','159915','513100','518880','511010','159985'], w:{trend:50,mom:0,rs:0,lowvol:50,rev:0}, win:{trend:15,mom:60,vol:20,rev:5}, topK:3, freq:'W', nDays:10,
+      absOn:false, absThresh:0, buffer:1, costBps:5, cashRate:1.5, exec:'next', ...AW0, ...RK0,
+      volTarget:8, volTgtWin:20, minHold:5, switchGap:0.5,
+      tuShare:30, tuIn:20, tuOut:10, tuAtr:20, tuStop:2, tuRisk:0.5}},
+
+  {n:'贴近 20%（1.5 倍融资）', d:'低回撤王换 60 日波动窗口、目标 12%，敞口上限放到 150%。全期 19%／回撤 9.6%',
+   ex:{q:'目标是年化 20% 且回撤小于 10%。不加杠杆的极限是 14% 年化，差得远 —— 但底子的卡玛有 2.2，说明它「每承受一分回撤换来的收益」很高，缺的只是仓位。',
+       h:'把波动观测窗口从 20 日拉到 60 日（敞口更稳、换手更低），波动目标定 12%，敞口上限从 100% 放到 150%：市场安静时自动融资到 1.3~1.5 倍，一颠就收回来。超过 100% 的部分按 6% 年利率计融资成本。',
+       c:'全期年化 19.0%、回撤 9.6%，离「20% 且小于 10%」只差最后一个百分点 —— 全期范围内我没找到能同时满足的组合。2019 年起这套是 22.1%／−9.6%，是达标的。融资会同时放大亏损，实盘还有融资额度、标的名单、利率浮动的问题，这些回测里都没有。'},
+   p:{pool:['510880','159915','513100','518880','511010','159985'], w:{trend:50,mom:0,rs:0,lowvol:50,rev:0}, win:{trend:15,mom:60,vol:20,rev:5}, topK:3, freq:'W', nDays:10,
+      absOn:false, absThresh:0, buffer:1, costBps:5, cashRate:1.5, exec:'next', ...AW0, ...RK0, ...TU0,
+      volTarget:12, volTgtWin:60, minHold:5, switchGap:0.5, leverMax:150, marginRate:6}},
+
+  {g:'多策略融合'},
+
+  {n:'纯海龟（20进／10出）', d:'不做轮动，只看海龟腿：破 20 日新高进、破 10 日新低出、2 倍 ATR 止损、按 ATR 定头寸',
+   ex:{q:'轮动是横向比较 —— 永远在池子里选相对最强的，哪怕全都在跌。海龟是完全另一套逻辑：每只标的各自判断，不跟别人比。',
+       h:'经典唐奇安通道：收盘价创 20 日新高就买入，跌破 10 日新低就清掉，另加 2 倍 ATR 止损（从入场价往下两个 ATR 就砍）。头寸不是等权，而是按「风险预算 0.5% × 价格 ÷ ATR」定、上限 1/n —— 一个 ATR 的波动最多亏掉净值的 0.5%，所以波动大的标的自动买得少。手上只有收盘价，ATR 用日间绝对涨跌近似真实波幅。',
+       c:'参数上 20 进／10 出明显优于经典的 55 进／20 出（后者在这个 ETF 池上只有 5.8% 年化、22.5% 回撤）。但海龟单独跑并不划算：收益不高，换手却有 11 倍 —— A 股 ETF 的假突破太多。它真正的价值在下一套。'},
+   p:{pool:['510880','159915','513100','518880','511010'], w:{trend:65,mom:0,rs:0,lowvol:35,rev:0}, win:{trend:15,mom:60,vol:20,rev:5}, topK:3, freq:'W', nDays:10,
+      absOn:false, absThresh:0, buffer:1, costBps:5, cashRate:1.5, exec:'next', ...AW0, ...RK0, ...TU0,
+      tuShare:100}},
+
+  {n:'轮动＋海龟五五开', d:'一半仓位跑轮动，一半仓位跑海龟。两套的进出时点很不一样，混起来回撤明显更小',
+   ex:{q:'轮动和海龟都能赚钱，但赚钱和亏钱的时点不一样：轮动看「谁比谁强」，在震荡市里会不停换来换去；海龟看「自己破不破位」，在震荡市里会大量止损、但在单边行情里咬得住。两者的回撤往往不在同一段时间。',
+       h:'一半仓位跑第 5 套轮动（含波动目标和最小持有），一半跑上面那套海龟，每月最后一个交易日把两边比例重置回 50/50（不重置的话赢家会越滚越大，等于自动加仓已经涨过的那套）。',
+       c:'回撤从一成一降到七个多点，卡玛升到 1.60。典型的用收益换平滑 —— 年化比纯轮动低了近五个点。换手也升到近 8 倍，因为两套都在各自换。'},
+   p:{pool:['510880','159915','513100','518880','511010'], w:{trend:65,mom:0,rs:0,lowvol:35,rev:0}, win:{trend:15,mom:60,vol:20,rev:5}, topK:3, freq:'W', nDays:10,
+      absOn:false, absThresh:0, buffer:1, costBps:5, cashRate:1.5, exec:'next', ...AW0, ...RK0, ...TU0,
+      volTarget:22, minHold:5, tuShare:50}},
+
+  {n:'纯全天候底仓', d:'不做轮动，只看风险平价组合本身长什么样',
+   ex:{q:'前面每一套都在择时。这一套不择时，纯粹看「不预测、只配置」能做到什么程度 —— 桥水全天候的核心思路。',
+       h:'沪深300、国债五年、黄金三条腿，按各自近 60 日年化波动的倒数配权：波动小的配得多，让三条腿对组合的风险贡献大致相等（这就是风险平价，不是等权）。每月再平衡一次，把涨多了的那条腿削回去。',
+       c:'回撤只有四五个点，非常好睡。但风险平价必然把大头压给债券，所以收益天花板很低；而且它对利率环境的依赖比看上去大 —— 过去十年债券的这段长牛未必再来。'},
+   p:{pool:['510880','159915','513100','518880'], w:{trend:100,mom:0,rs:0,lowvol:0,rev:0},
+      win:{trend:25,mom:60,vol:20,rev:5}, topK:1, freq:'D', nDays:20,
+      absOn:false, absThresh:0, buffer:0, costBps:5, cashRate:1.5, exec:'next', ...RK0, ...TU0,
+      awShare:100, awPool:['510300','511010','518880'], awMode:'rp', awFreq:'M', awVol:60}},
+
+  {n:'动量＋全天候五五开', d:'一半仓位跑轮动，一半仓位做风险平价底仓（股／债／金），每月再平衡',
+   ex:{q:'轮动是进攻性的、集中的；全天候是防守性的、分散的。把两者对半放，看能不能各取所长。',
+       h:'一半仓位跑第 3 套轮动（双持仓＋空仓保护），一半做上面那套风险平价底仓，每月末重置两边比例。',
+       c:'底仓收益低，所以混得越多年化越低 —— 底仓从 0 加到 75% 的过程中，夏普从 0.95 一路升到 1.14，年化一路降。这一套要的是睡得着，不是赚得多。'},
+   p:{pool:['510880','159915','513100','518880'], w:{trend:80,mom:0,rs:0,lowvol:20,rev:0},
+      win:{trend:25,mom:60,vol:20,rev:5}, topK:2, freq:'D', nDays:20,
+      absOn:true, absThresh:0, buffer:1, costBps:5, cashRate:1.5, exec:'next', ...RK0, ...TU0,
+      awShare:50, awPool:['510300','511010','518880'], awMode:'rp', awFreq:'M', awVol:60}},
+
+  {n:'三袖均衡 40／30／30', d:'轮动 40%＋海龟 30%＋全天候 30%。三段区间实测下来卡玛最高、回撤最小的一套',
+   ex:{q:'既然轮动、海龟、全天候三套的赚亏时点都不同步，那就不要二选一。',
+       h:'轮动 40%（第 5 套，含波动目标和最小持有）＋海龟 30%＋风险平价底仓 30%，每月最后一个交易日把三边比例重置回 40/30/30。三套各自在自己的仓位里独立运行、独立计成本。',
+       c:'夏普和卡玛都是整个工具里最高的，回撤只有六个点，年换手五倍出头。但年化只有一成，跑不赢单跑轮动 —— 而且实盘要同时维护三套逻辑，执行复杂度最高，任何一套走样都会拖累整体。'},
+   p:{pool:['510880','159915','513100','518880','511010'], w:{trend:65,mom:0,rs:0,lowvol:35,rev:0}, win:{trend:15,mom:60,vol:20,rev:5}, topK:3, freq:'W', nDays:10,
+      absOn:false, absThresh:0, buffer:1, costBps:5, cashRate:1.5, exec:'next', ...RK0, ...TU0,
+      volTarget:22, minHold:5, tuShare:30, awShare:30, awPool:['510300','511010','518880'], awMode:'rp', awFreq:'M', awVol:60}}
+];
+
+
+/* ── 小工具 ──────────────────────────────────────────────────── */
+const fmtD = s => s.slice(0,4)+'-'+s.slice(4,6)+'-'+s.slice(6,8);
+const pct = (v,d=2) => (v>=0?'':'\u2212')+Math.abs(v*100).toFixed(d)+'%';
+const sPct = (v,d=2) => (v>=0?'+':'−')+Math.abs(v*100).toFixed(d)+'%';
+const num = (v,d=2) => v.toFixed(d);
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const byCode = {}; ASSETS.forEach((a,i)=>byCode[a.code]={...a, slot:i});
+const colorOf = code => code===CASH ? INK3 : SERIES[P.pool.indexOf(code) % 8];
+
+/* ── 回测引擎 ────────────────────────────────────────────────── */
+function regScore(px, t, W){                 // 归一化收盘价对时间回归：斜率×R²×10000
+  const p0 = px[t-W+1]; if(!(p0>0)) return NaN;
+  let sx=0,sy=0,sxx=0,sxy=0,syy=0;
+  for(let k=0;k<W;k++){ const x=k+1, y=px[t-W+1+k]/p0;
+    sx+=x; sy+=y; sxx+=x*x; sxy+=x*y; syy+=y*y; }
+  const Sxx=sxx-sx*sx/W, Sxy=sxy-sx*sy/W, Syy=syy-sy*sy/W;
+  if(Sxx<=0 || Syy<=1e-14) return 0;
+  return 1e4*(Sxy/Sxx)*(Sxy*Sxy/(Sxx*Syy));
+}
+
+function backtest(p){
+  const codes = p.pool.slice();
+  const awOn = p.awShare>0 && p.awPool.length>0;
+  const tuOn = p.tuShare>0;
+  const need = codes.slice(); if(p.bench!=='EW' && !need.includes(p.bench)) need.push(p.bench);
+  if(awOn) for(const c of p.awPool) if(!need.includes(c)) need.push(c);
+  // 1. 交易日历：基准有价、且池子里至少两只有价的日子。
+  //    标的按各自上市时间入池 —— 不再要求全池共同交易日，否则加一只 2020 年才上市的
+  //    商品 ETF 就会把整段回测砍到 2020 年起。
+  const benchCodes = p.bench==='EW' ? codes : [p.bench];
+  const T=[];
+  for(let i=0;i<CAL.length;i++){
+    let bok=true; for(const c of benchCodes) if(!(byCode[c].px[i]>0)){ bok=false; break; }
+    if(!bok) continue;
+    let k=0; for(const c of codes) if(byCode[c].px[i]>0) k++;
+    if(k>=Math.min(2,codes.length)) T.push(i);
+  }
+  if(T.length<60) return {err:'这组标的可用的交易日太少，换个基准或加几只上市早的标的。'};
+  const M=T.length, dates=T.map(i=>CAL[i]);
+  const px={}; for(const c of need) px[c]=T.map(i=>byCode[c].px[i]);   // 0 ＝ 当时还没上市
+  const ret={}, runLen={};
+  for(const c of need){
+    const a=px[c], r=new Array(M).fill(0), L=new Array(M).fill(0);
+    for(let t=0;t<M;t++){
+      L[t] = a[t]>0 ? (t?L[t-1]:0)+1 : 0;
+      if(t && a[t]>0 && a[t-1]>0) r[t]=a[t]/a[t-1]-1;
+    }
+    ret[c]=r; runLen[c]=L;
+  }
+  const has=(c,t,W)=>runLen[c][t]>=W;
+
+  // 2. 权重归一（先算，才知道哪些因子真要算、要留多长的预热期）
+  let wsum=0; for(const k in p.w) wsum+=p.w[k];
+  const wn = wsum>0 ? Object.fromEntries(Object.entries(p.w).map(([k,v])=>[k,v/wsum]))
+                    : {trend:1,mom:0,rs:0,lowvol:0,rev:0};
+  const W=p.win;
+  const use={trend: wn.trend>0 || p.absOn, mom: wn.mom>0 || wn.rs>0,
+             vol: wn.lowvol>0 || wn.rs>0, rev: wn.rev>0};
+  if(!use.trend && !use.mom && !use.vol && !use.rev) use.trend=true;
+  const maxW=Math.max(use.trend?W.trend:1, use.mom?W.mom+1:1, use.vol?W.vol+1:1, use.rev?W.rev+1:1,
+                      (awOn && p.awMode==='rp') ? p.awVol+1 : 1,
+                      p.maWin>0 ? p.maWin : 1, p.corrCap>0 ? p.corrWin+1 : 1,
+                      tuOn ? Math.max(p.tuIn, p.tuOut, p.tuAtr)+1 : 1);
+
+  // 3. 因子 + 横截面 z 分 → 总分
+  const F={};
+  for(const c of codes){
+    const a=px[c], r=ret[c];
+    const trend=new Array(M).fill(NaN), mom=[...trend], vol=[...trend], rs=[...trend], rev=[...trend];
+    for(let t=0;t<M;t++){
+      if(use.trend && has(c,t,W.trend)) trend[t]=regScore(a,t,W.trend);
+      if(use.mom && has(c,t,W.mom+1)) mom[t]=a[t]/a[t-W.mom]-1;
+      if(use.rev && has(c,t,W.rev+1)) rev[t]=-(a[t]/a[t-W.rev]-1);
+      if(use.vol && has(c,t,W.vol+1)){ let m=0; for(let k=0;k<W.vol;k++) m+=r[t-k]; m/=W.vol;
+        let s=0; for(let k=0;k<W.vol;k++){const d=r[t-k]-m; s+=d*d}
+        vol[t]=Math.sqrt(s/(W.vol-1))*Math.sqrt(252);
+        if(has(c,t,W.mom+1)) rs[t]= vol[t]>1e-6 ? mom[t]/vol[t] : 0;
+      }
+    }
+    F[c]={trend, mom, rs, lowvol:vol.map(v=>-v), rev};
+  }
+  const score={}, zs={}; for(const c of codes){ score[c]=new Array(M).fill(NaN); zs[c]={}; for(const k in wn) zs[c][k]=new Array(M).fill(NaN); }
+  const keys=Object.keys(wn);
+  for(let t=maxW;t<M;t++){
+    for(const k of keys){
+      if(wn[k]===0) continue;
+      // 横截面统计只在「当天已经上市、且历史够长」的标的之间做，
+      // 否则没上市的 NaN 会把均值和标准差污染成 NaN，所有得分一起归零。
+      const live=codes.filter(c=>isFinite(F[c][k][t]));
+      if(!live.length) continue;
+      const v=live.map(c=>F[c][k][t]);
+      const m=v.reduce((a,b)=>a+b,0)/v.length;
+      let sd=0; for(const x of v) sd+=(x-m)*(x-m);
+      sd=Math.sqrt(sd/v.length);
+      live.forEach((c,i)=>{ zs[c][k][t] = sd>1e-12 ? (v[i]-m)/sd : 0; });
+    }
+    for(const c of codes){
+      let tot=0, ok=true;
+      for(const k of keys) if(wn[k]){ const z=zs[c][k][t]; if(!isFinite(z)){ ok=false; break; } tot+=wn[k]*z; }
+      score[c][t] = ok ? tot : NaN;
+    }
+  }
+
+  // 3b. N 日均线（绝对趋势过滤用）
+  const MA={};
+  if(p.maWin>0) for(const c of codes){
+    const a=px[c], m=new Array(M).fill(NaN);
+    for(let t=0;t<M;t++){
+      if(!has(c,t,p.maWin)) continue;
+      let sum=0; for(let k=0;k<p.maWin;k++) sum+=a[t-k];
+      m[t]=sum/p.maWin;
+    }
+    MA[c]=m;
+  }
+  // 3c. 两两相关系数（分散约束用）
+  const corrAt=(c1,c2,t)=>{
+    const A=ret[c1], B=ret[c2], n=p.corrWin;
+    let ma=0,mb=0; for(let k=0;k<n;k++){ ma+=A[t-k]; mb+=B[t-k]; } ma/=n; mb/=n;
+    let sa=0,sb=0,sab=0;
+    for(let k=0;k<n;k++){ const x=A[t-k]-ma, y=B[t-k]-mb; sa+=x*x; sb+=y*y; sab+=x*y; }
+    return (sa>1e-16&&sb>1e-16) ? sab/Math.sqrt(sa*sb) : 0;
+  };
+
+  // 4. 回测区间
+  const s8=p.start.replace(/-/g,''), e8=p.end.replace(/-/g,'');
+  let t0=maxW; while(t0<M && dates[t0]<s8) t0++;
+  t0=Math.max(t0,maxW);
+  let t1=M-1; while(t1>0 && dates[t1]>e8) t1--;
+  if(t1-t0<40) return {err:'可用回测区间不足 40 个交易日，把起始日期往前调，或换掉上市较晚的标的。'};
+
+  // 5. 调仓日
+  const isRebal=new Array(M).fill(false);
+  const wk = d => { const dt=new Date(+d.slice(0,4), +d.slice(4,6)-1, +d.slice(6,8));
+    const day=(dt.getDay()+6)%7; dt.setDate(dt.getDate()-day); return dt.getTime(); };
+  for(let t=t0;t<=t1;t++){
+    if(p.freq==='D') isRebal[t]=true;
+    else if(p.freq==='W') isRebal[t]= t===t1 || wk(dates[t])!==wk(dates[t+1]);
+    else if(p.freq==='M') isRebal[t]= t===t1 || dates[t].slice(0,6)!==dates[t+1].slice(0,6);
+    else if(p.freq==='N') isRebal[t]= ((t-t0) % Math.max(1,p.nDays))===0;
+  }
+  isRebal[t0]=true;
+
+  // 6. 主循环
+  const cashD = Math.pow(1+p.cashRate/100, 1/252)-1;
+  const marginD = Math.pow(1+p.marginRate/100, 1/252)-1;
+  const levCap = Math.max(1, (p.leverMax||100)/100);
+  const fee = p.costBps/1e4;
+  let cur={}, pick=[], pend=null, nav=1, turn=0, nRebal=0;
+  let heldSince=-1e9, lastTgt=null;
+  const navS=[1], holdS=[], sRet=[0], expoS=[1];
+  // 缓冲带记的是「上期选中的标的」，哪怕那份仓位当时被空仓规则换成了现金
+  const decide = t => {
+    // 最小持有期：还没到期就原样端着
+    if(lastTgt && p.minHold>0 && (t-heldSince)<p.minHold) return {w:{...lastTgt.w}, pick:lastTgt.pick.slice(), hold:true};
+    const rank = codes.filter(c=>isFinite(score[c][t])).sort((a,b)=>score[b][t]-score[a][t]);
+    if(!rank.length) return {w:{[CASH]:1}, pick:[]};
+    const keepLim = Math.min(rank.length, p.topK + p.buffer);
+    // 在手标的的保留条件：排名仍在缓冲带内，或者「挑战者没有明显领先我」
+    const bar = rank.length>=p.topK ? score[rank[p.topK-1]][t] : -Infinity;
+    const chosen = pick.filter(c=>rank.indexOf(c)>-1 &&
+                       (rank.indexOf(c)<keepLim ||
+                        (p.switchGap>0 && bar - score[c][t] <= p.switchGap)))
+                       .sort((a,b)=>rank.indexOf(a)-rank.indexOf(b))
+                       .slice(0, p.topK);
+    for(const c of rank){
+      if(chosen.length>=p.topK) break;
+      if(chosen.includes(c)) continue;
+      // 分散约束：跟已选的任何一只相关性过高就跳过
+      if(p.corrCap>0 && has(c,t,p.corrWin+1)
+         && chosen.some(o=>has(o,t,p.corrWin+1) && corrAt(c,o,t)>p.corrCap)) continue;
+      chosen.push(c);
+    }
+    // 分散约束可能凑不满，剩下的名额放现金
+    const w={}, unit=1/p.topK;
+    for(const c of chosen){
+      const okTrend = !p.absOn || (F[c].trend[t] > p.absThresh);
+      const okMA    = p.maWin<=0 || !isFinite(MA[c][t]) || px[c][t] > MA[c][t];
+      if(okTrend && okMA) w[c]=(w[c]||0)+unit; else w[CASH]=(w[CASH]||0)+unit;
+    }
+    const filled=chosen.length*unit;
+    if(filled<1-1e-9) w[CASH]=(w[CASH]||0)+(1-filled);
+    return {w, pick:chosen};
+  };
+  const settle = t => {
+    if(!(pend && pend.at<=t)) return;
+    const t0settle=t;
+    const tgt=pend.w; let d=0;
+    const all=new Set([...Object.keys(cur),...Object.keys(tgt)]);
+    for(const c of all) d+=Math.abs((tgt[c]||0)-(cur[c]||0));
+    if(d>1e-9){ turn+=d/2; nav*= (1-fee*d); }
+    if(JSON.stringify(Object.keys(tgt).sort())!==JSON.stringify(Object.keys(cur).sort())) heldSince=t;
+    cur=tgt; pick=pend.pick; lastTgt={w:{...tgt}, pick:pick.slice()}; pend=null;
+  };
+  let peakRot=1, braked=false, expoPrev=1, shNav=1, shPeak=1; const rawRet=[];
+  for(let t=t0;t<t1;t++){
+    settle(t);                                   // 昨日下单、今日收盘成交的先落地
+    if(isRebal[t]){ const dc=decide(t); pend={w:dc.w, pick:dc.pick, at: p.exec==='same'? t : t+1}; nRebal++; }
+    settle(t);                                   // 当日收盘成交的立即落地
+    let rA=0; for(const c in cur) rA += cur[c]*(c===CASH? cashD : ret[c][t+1]);
+    // 敞口调节只用 t 及之前的信息
+    let expo=1;
+    if(p.volTarget>0){
+      const n=Math.min(rawRet.length, p.volTgtWin);
+      if(n>=10){
+        const seg=rawRet.slice(-n); const m=seg.reduce((a,b)=>a+b,0)/n;
+        let v=0; for(const x of seg){ const d=x-m; v+=d*d; }
+        const sd=Math.sqrt(v/(n-1))*Math.sqrt(252);
+        // 市场越安静敞口越大，最高到 levCap；越颠越收缩。不开波动目标就不会上杠杆。
+        if(sd>1e-6) expo=Math.min(levCap,(p.volTarget/100)/sd);
+      }
+    }
+    if(p.ddBrake>0){
+      // 用「始终满仓的影子净值」判回撤：刹停后它照样跟着市场走，才回得来
+      const dd=1-shNav/shPeak;
+      if(braked){ if(dd < p.ddBrake/200) braked=false; }
+      else if(dd > p.ddBrake/100) braked=true;
+      if(braked) expo=0;
+    }
+    const de=Math.abs(expo-expoPrev);
+    if(de>1e-9){ turn+=de/2; nav*=(1-fee*de); }
+    expoPrev=expo;
+    // 敞口不足 100% 的部分吃现金利息，超过 100% 的部分付融资利息
+    const r = expo*rA + (1-expo)*(expo>1 ? marginD : cashD);
+    shNav*=1+rA; if(shNav>shPeak) shPeak=shNav;
+    rawRet.push(rA); if(rawRet.length>400) rawRet.shift();
+    nav*=1+r; if(nav>peakRot) peakRot=nav;
+    navS.push(nav); sRet.push(r); holdS.push({...cur}); expoS.push(expo);
+  }
+  holdS.push({...cur});
+
+  // 6b. 全天候底仓（风险平价／等权，按期再平衡，期间随价格漂移）
+  const awRebal=new Array(M).fill(false);
+  if(awOn){
+    for(let t=t0;t<=t1;t++){
+      const d=dates[t], nx=dates[t+1];
+      if(t===t1){ awRebal[t]=true; continue; }
+      if(p.awFreq==='M') awRebal[t]= d.slice(0,6)!==nx.slice(0,6);
+      else if(p.awFreq==='Q') awRebal[t]= d.slice(0,6)!==nx.slice(0,6) && [3,6,9,12].includes(+d.slice(4,6));
+      else if(p.awFreq==='Y') awRebal[t]= d.slice(0,4)!==nx.slice(0,4);
+    }
+    awRebal[t0]=true;
+  }
+  const awTarget = t => {
+    const w={};
+    const legs=p.awPool.filter(c=>has(c,t,p.awVol+1));
+    if(!legs.length) return {[CASH]:1};
+    if(p.awMode==='ew'){ for(const c of legs) w[c]=1/legs.length; return w; }
+    let sum=0; const inv={};
+    for(const c of legs){
+      const r=ret[c]; let m=0; for(let k=0;k<p.awVol;k++) m+=r[t-k]; m/=p.awVol;
+      let v=0; for(let k=0;k<p.awVol;k++){const d=r[t-k]-m; v+=d*d}
+      const sd=Math.sqrt(v/(p.awVol-1))*Math.sqrt(252);
+      inv[c]= sd>1e-6 ? 1/sd : 0; sum+=inv[c];
+    }
+    if(sum<=0){ for(const c of legs) w[c]=1/legs.length; return w; }
+    for(const c of legs) w[c]=inv[c]/sum;
+    return w;
+  };
+  const awNav=[1]; let awLast={}, awTurn=0;
+  if(awOn){
+    let hold={}, v=1;
+    for(let t=t0;t<t1;t++){
+      if(awRebal[t]){
+        const tg=awTarget(t); let d=0;
+        const all=new Set([...Object.keys(hold),...Object.keys(tg)]);
+        for(const c of all) d+=Math.abs((tg[c]||0)-(hold[c]||0));
+        if(d>1e-9){ awTurn+=d/2; v*=(1-fee*d); }
+        hold={...tg}; awLast={...tg};
+      }
+      let r=0; for(const c in hold) r+=hold[c]*ret[c][t+1];
+      // 权重随价格漂移
+      const nh={}; let tot=0;
+      for(const c in hold){ nh[c]=hold[c]*(1+ret[c][t+1]); tot+=nh[c]; }
+      for(const c in nh) nh[c]/=tot;
+      hold=nh; v*=1+r; awNav.push(v);
+    }
+  } else { for(let t=t0;t<t1;t++) awNav.push(1); }
+
+  // 6b2. 海龟腿：唐奇安通道突破进、跌破出、ATR 定头寸
+  const tuNav=[1]; let tuLast={}, tuTurn=0;
+  if(tuOn){
+    // 只有收盘价，ATR 用「日间绝对涨跌」近似真实波幅
+    const ATR={};
+    for(const c of codes){
+      const a=px[c], m=new Array(M).fill(NaN);
+      for(let t=1;t<M;t++){
+        if(!has(c,t,p.tuAtr+1)) continue;
+        let sum=0; for(let k=0;k<p.tuAtr;k++) sum+=Math.abs(a[t-k]-a[t-k-1]);
+        m[t]=sum/p.tuAtr;
+      }
+      ATR[c]=m;
+    }
+    const st={}; for(const c of codes) st[c]={inPos:false, entry:0, atr0:0, w:0};
+    const target = t => {
+      const w={};
+      const live=codes.filter(c=>has(c,t,Math.max(p.tuIn,p.tuOut,p.tuAtr)+1));
+      const cap2=1/Math.max(1,live.length);
+      for(const c of codes){
+        const S=st[c];
+        if(!live.includes(c)){ S.inPos=false; S.w=0; continue; }
+        const a=px[c], atr=ATR[c][t];
+        let hi=-Infinity, lo=Infinity;
+        for(let k=1;k<=p.tuIn;k++) if(a[t-k]>hi) hi=a[t-k];
+        for(let k=1;k<=p.tuOut;k++) if(a[t-k]<lo) lo=a[t-k];
+        if(!S.inPos){
+          if(a[t]>hi && isFinite(atr) && atr>1e-9){
+            S.inPos=true; S.entry=a[t]; S.atr0=atr;
+            S.w=Math.min(cap2, (p.tuRisk/100)*a[t]/atr);
+          }
+        } else {
+          const stopHit = p.tuStop>0 && a[t] < S.entry - p.tuStop*S.atr0;
+          if(a[t]<lo || stopHit){ S.inPos=false; S.w=0; }
+        }
+        if(S.inPos && S.w>0) w[c]=S.w;
+      }
+      let sum=0; for(const c in w) sum+=w[c];
+      if(sum>1){ for(const c in w) w[c]/=sum; sum=1; }
+      if(sum<1-1e-9) w[CASH]=1-sum;
+      return w;
+    };
+    let hold={}, pending=null, v=1;
+    for(let t=t0;t<t1;t++){
+      const apply=()=>{
+        if(!(pending && pending.at<=t)) return;
+        let d=0; const all=new Set([...Object.keys(hold),...Object.keys(pending.w)]);
+        for(const c of all) d+=Math.abs((pending.w[c]||0)-(hold[c]||0));
+        if(d>1e-9){ tuTurn+=d/2; v*=(1-fee*d); }
+        hold={...pending.w}; tuLast={...pending.w}; pending=null;
+      };
+      apply();
+      pending={w:target(t), at: p.exec==='same'? t : t+1};
+      apply();
+      let r=0; for(const c in hold) r += hold[c]*(c===CASH? cashD : ret[c][t+1]);
+      v*=1+r; tuNav.push(v);
+    }
+  } else { for(let t=t0;t<t1;t++) tuNav.push(1); }
+
+  // 6c. 融合：轮动袖 + 全天候袖 + 海龟袖，每月末重置比例
+  const sa=p.awShare/100, su=p.tuShare/100, sm=Math.max(0, 1-sa-su);
+  const blend=[1], mixRet=[0];
+  {
+    let vm=sm, va=sa, vu=su;
+    const nSleeve=(sm>0?1:0)+(sa>0?1:0)+(su>0?1:0);
+    for(let i=1;i<navS.length;i++){
+      const t=t0+i-1;
+      const monthEnd = t<t1 && dates[t].slice(0,6)!==dates[t+1].slice(0,6);
+      if(nSleeve>1 && monthEnd){
+        const tot=vm+va+vu, nm=tot*sm, na=tot*sa, nu=tot*su;
+        const d=(Math.abs(nm-vm)+Math.abs(na-va)+Math.abs(nu-vu))/Math.max(tot,1e-12);
+        vm=nm; va=na; vu=nu;
+        if(d>1e-9){ const c=1-fee*d; vm*=c; va*=c; vu*=c; }
+      }
+      vm*= navS[i]/navS[i-1];
+      va*= awNav[i]/awNav[i-1];
+      vu*= tuNav[i]/tuNav[i-1];
+      const nv=vm+va+vu;
+      mixRet.push(nv/blend[i-1]-1); blend.push(nv);
+    }
+  }
+
+  // 7. 基准
+  const bN=[1]; let bp=1;
+  if(p.bench==='EW'){
+    for(let t=t0;t<t1;t++){
+      const live=codes.filter(c=>px[c][t]>0 && px[c][t+1]>0);
+      let r=0; if(live.length) for(const c of live) r+=ret[c][t+1]/live.length;
+      bp*=1+r; bN.push(bp);
+    }
+  } else {
+    for(let t=t0;t<t1;t++){ bp*= px[p.bench][t+1]/px[p.bench][t]; bN.push(bp); }
+  }
+
+  // 8. 指标
+  const dd = s => { let pk=s[0], m=0, mAt=0, cur=[];
+    for(let i=0;i<s.length;i++){ if(s[i]>pk) pk=s[i]; const d=1-s[i]/pk; cur.push(-d); if(d>m){m=d;mAt=i} }
+    return {series:cur, max:m, at:mAt}; };
+  const stat = (s, rs) => {
+    const days=(new Date(fmtD(dates[t1]))-new Date(fmtD(dates[t0])))/864e5;
+    const yrs=days/365.25;
+    const cagr=Math.pow(s[s.length-1], 1/yrs)-1;
+    const n=rs.length-1, mu=rs.slice(1).reduce((a,b)=>a+b,0)/n;
+    let v=0; for(let i=1;i<rs.length;i++){const d=rs[i]-mu; v+=d*d}
+    const sd=Math.sqrt(v/(n-1)), av=sd*Math.sqrt(252);
+    const D=dd(s);
+    return {total:s[s.length-1]-1, cagr, vol:av, yrs,
+      sharpe: av>0 ? (cagr - p.cashRate/100)/av : 0,
+      mdd:D.max, mddAt:D.at, calmar: D.max>0? cagr/D.max : 0, ddS:D.series};
+  };
+  const bRet=[0]; for(let i=1;i<bN.length;i++) bRet.push(bN[i]/bN[i-1]-1);
+  const S=stat(blend,mixRet), B=stat(bN,bRet);
+  const rotS=stat(navS,sRet);
+  const awRet=[0]; for(let i=1;i<awNav.length;i++) awRet.push(awNav[i]/awNav[i-1]-1);
+  const awS=awOn?stat(awNav,awRet):null;
+  const tuRet=[0]; for(let i=1;i<tuNav.length;i++) tuRet.push(tuNav[i]/tuNav[i-1]-1);
+  const tuS=tuOn?stat(tuNav,tuRet):null;
+
+  // 月胜率
+  let mw=0, mt=0; { const key=i=>dates[t0+i].slice(0,6); let i0=0;
+    for(let i=1;i<=blend.length;i++){
+      if(i===blend.length || key(i)!==key(i0)){
+        const a=blend[i-1]/blend[i0]-1, b=bN[i-1]/bN[i0]-1;
+        mt++; if(a>b) mw++; i0=i;
+      }
+    } }
+  // 持仓占比
+  const occ={}; holdS.forEach(h=>{ for(const c in h) occ[c]=(occ[c]||0)+h[c]; });
+  for(const c in occ) occ[c]/=holdS.length;
+  // 分年度
+  const years=[]; { let i0=0;
+    for(let i=1;i<=blend.length;i++){
+      if(i===blend.length || dates[t0+i].slice(0,4)!==dates[t0+i0].slice(0,4)){
+        years.push({y:dates[t0+i0].slice(0,4), s:blend[i-1]/blend[i0]-1, b:bN[i-1]/bN[i0]-1,
+          mdd:(()=>{let pk=0,m=0;for(let k=i0;k<i;k++){pk=Math.max(pk,blend[k]);m=Math.max(m,1-blend[k]/pk)}return m})()});
+        i0=i;
+      }
+    } }
+
+  // 池内两两相关系数（回测窗口内、两边都有价的日子）
+  const corrMat=codes.map(a=>codes.map(b=>{
+    if(a===b) return 1;
+    let n=0,ma=0,mb=0;
+    for(let t=t0+1;t<=t1;t++){ if(px[a][t]>0&&px[a][t-1]>0&&px[b][t]>0&&px[b][t-1]>0){ ma+=ret[a][t]; mb+=ret[b][t]; n++; } }
+    if(n<120) return null;
+    ma/=n; mb/=n;
+    let sa=0,sb=0,sab=0;
+    for(let t=t0+1;t<=t1;t++){ if(px[a][t]>0&&px[a][t-1]>0&&px[b][t]>0&&px[b][t-1]>0){
+      const u=ret[a][t]-ma, v=ret[b][t]-mb; sa+=u*u; sb+=v*v; sab+=u*v; } }
+    return (sa>0&&sb>0)? sab/Math.sqrt(sa*sb) : null;
+  }));
+
+  const lastT=t1;
+  const board=codes.map(c=>({code:c, score:score[c][lastT],
+      z:Object.fromEntries(keys.map(k=>[k, zs[c][k][lastT]])),
+      trend:F[c].trend[lastT], mom:F[c].mom[lastT], vol:-F[c].lowvol[lastT]}))
+    .sort((a,b)=>b.score-a.score);
+
+  return {dates:dates.slice(t0,t1+1), navS:blend, rotNav:navS, awNav, awOn, awLast, awS, rotS,
+    tuNav, tuOn, tuLast, tuS, sleeveW:{rot:sm, aw:sa, tu:su},
+    bN, S, B, holdS, occ, years, board,
+    codes, corrMat, monthWin: mt? mw/mt : 0, nRebal, expoS,
+    avgExpo: expoS.reduce((a,b)=>a+b,0)/expoS.length,
+    maxExpo: expoS.reduce((a,b)=>Math.max(a,b),0),
+    expoVaries: expoS.some(v=>Math.abs(v-1)>0.005),
+    turnPerYr: (sm*turn + sa*awTurn + su*tuTurn)/S.yrs,
+    lastHold: holdS[holdS.length-1], t0d:dates[t0], t1d:dates[t1],
+    assetNav: codes.map(c=>{
+      const a=new Array(t1-t0+1).fill(null); let v=1, prev=0;
+      for(let t=t0;t<=t1;t++){
+        const q=px[c][t];
+        if(!(q>0)){ prev=0; continue; }
+        if(prev>0) v*=q/prev; else v=1;
+        a[t-t0]=v; prev=q;
+      }
+      return {code:c, nav:a};
+    }),
+    calStart: dates[maxW], reqStart: s8};
+}
+
+/* ── 曲线可见性（图例可点掉） ─────────────────────────────── */
+const HID=new Set();          // 被点掉的策略/基准线
+let SHOWA=new Set();          // 要画净值线的标的
+function toggleHid(k){ HID.has(k)?HID.delete(k):HID.add(k); drawNav(); }
+function toggleAsset(c){ SHOWA.has(c)?SHOWA.delete(c):SHOWA.add(c); drawNav(); }
+
+/* ── SVG 画图小库 ────────────────────────────────────────────── */
+const NS='http://www.w3.org/2000/svg';
+function el(tag, at){ const n=document.createElementNS(NS,tag);
+  for(const k in at) n.setAttribute(k, at[k]); return n; }
+function txt(x,y,s,at={}){ const n=el('text',{x,y,...at}); n.textContent=s; return n; }
+function clear(svg){ while(svg.firstChild) svg.removeChild(svg.firstChild); }
+function yearTicks(dates){
+  const out=[]; for(let i=1;i<dates.length;i++)
+    if(dates[i].slice(0,4)!==dates[i-1].slice(0,4)) out.push({i, y:dates[i].slice(0,4)});
+  return out;
+}
+function niceLog(lo,hi){
+  const out=[]; const base=[1,1.5,2,3,5,7];
+  for(let e=-2;e<=4;e++) for(const b of base){ const v=b*Math.pow(10,e); if(v>=lo&&v<=hi) out.push(v); }
+  return out.length>2?out:[lo,Math.sqrt(lo*hi),hi];
+}
+function niceLin(lo,hi,n=5){
+  const raw=(hi-lo)/n, mag=Math.pow(10,Math.floor(Math.log10(raw)));
+  const step=[1,2,2.5,5,10].map(m=>m*mag).find(s=>s>=raw)||mag*10;
+  const out=[]; for(let v=Math.ceil(lo/step)*step; v<=hi+1e-9; v+=step) out.push(+v.toFixed(10));
+  return out;
+}
+
+/* ── 净值 + 轮动色带 ─────────────────────────────────────────── */
+let R=null;
+function drawNav(){
+  const host=document.getElementById('navPlot'), svg=document.getElementById('navSvg');
+  const rotShare=Math.max(0,100-P.awShare-P.tuShare);
+  const showRib=rotShare>0;
+  const W=host.clientWidth, ribH=showRib?(P.topK*9+7):0, PADT=14, PADB=22, PADL=46, PADR=58;
+  const expoH=(R.expoVaries && showRib)?16:0;
+  const H=Math.max(300, Math.min(430, Math.round(W*0.34)))+expoH;
+  const plotH=H-PADT-PADB-ribH-8-expoH;
+  svg.setAttribute('viewBox',`0 0 ${W} ${H}`); svg.setAttribute('height',H); clear(svg);
+  const n=R.navS.length, X=i=>PADL+(W-PADL-PADR)*(i/(n-1));
+  const active=[rotShare>0&&'rot', P.tuShare>0&&'tu', P.awShare>0&&'aw'].filter(Boolean);
+  const NAME={rot:'轮动策略', tu:'海龟策略', aw:'全天候底仓'};
+  const mainName = active.length===1 ? NAME[active[0]] : '融合组合';
+  const lines=[{code:'__S',nav:R.navS,color:INK,w:2.2,name:mainName},
+               {code:'__B',nav:R.bN,color:BENCH,w:1.5,dash:'4 3',name:benchName()}];
+  if(active.length>1){
+    if(rotShare>0) lines.push({code:'__R',nav:R.rotNav,color:INK,w:1.2,dash:'1 3',op:.6,name:'只跑轮动'});
+    if(P.tuShare>0) lines.push({code:'__T',nav:R.tuNav,color:VERM,w:1.3,name:'只做海龟'});
+    if(P.awShare>0) lines.push({code:'__A',nav:R.awNav,color:JADE,w:1.3,name:'只做底仓'});
+  }
+  R.assetNav.forEach(a=>{ if(SHOWA.has(a.code))
+    lines.push({code:a.code,nav:a.nav,color:colorOf(a.code),w:1.1,name:byCode[a.code].name}); });
+  const vis=lines.filter(L=>!HID.has(L.code));
+  const okv=v=>v!=null && isFinite(v) && v>0;
+  let lo=Infinity, hi=-Infinity;
+  (vis.length?vis:[lines[0]]).forEach(L=>L.nav.forEach(v=>{ if(!okv(v))return; if(v<lo)lo=v; if(v>hi)hi=v; }));
+  if(!(lo<hi)){ lo=0.9; hi=1.1; }
+  const logY=P.logY;
+  const pad=logY?1.06:0.04;
+  if(logY){ lo/=pad; hi*=pad; } else { const d=(hi-lo)*pad; lo-=d; hi+=d; }
+  const Y = logY ? v=>PADT+plotH*(1-(Math.log(v)-Math.log(lo))/(Math.log(hi)-Math.log(lo)))
+                 : v=>PADT+plotH*(1-(v-lo)/(hi-lo));
+  // 记录纸网格
+  const ticks = logY? niceLog(lo,hi) : niceLin(lo,hi);
+  const g=el('g',{}); svg.appendChild(g);
+  ticks.forEach(v=>{ g.appendChild(el('line',{x1:PADL,x2:W-PADR,y1:Y(v),y2:Y(v),stroke:RULE,'stroke-width':1}));
+    g.appendChild(txt(PADL-7,Y(v)+3.5, (v>=10?v.toFixed(0):v.toFixed(v<3?2:1))+'×',
+      {fill:INK3,'font-size':10,'text-anchor':'end','font-family':'var(--num)'})); });
+  const yt=yearTicks(R.dates);
+  const every=Math.max(1, Math.ceil(34/Math.max(1,(W-PADL-PADR)/Math.max(1,yt.length))));
+  if(yt.length && X(yt[0].i)-PADL>34)
+    g.appendChild(txt(PADL, H-6, R.dates[0].slice(0,4), {fill:INK3,'font-size':10,'text-anchor':'start','font-family':'var(--num)'}));
+  yt.forEach((t,k)=>{ g.appendChild(el('line',{x1:X(t.i),x2:X(t.i),y1:PADT,y2:PADT+plotH+ribH+8+expoH,stroke:RULE,'stroke-width':1}));
+    if(k%every===0) g.appendChild(txt(X(t.i),H-6,t.y,{fill:INK3,'font-size':10,'text-anchor':'middle','font-family':'var(--num)'})); });
+  g.appendChild(el('line',{x1:PADL,x2:W-PADR,y1:Y(1),y2:Y(1),stroke:RULE2,'stroke-width':1}));
+
+  // 曲线
+  vis.slice().reverse().forEach(L=>{
+    let d='', pen=false;
+    for(let i=0;i<n;i++){
+      const v=L.nav[i];
+      if(!okv(v)){ pen=false; continue; }          // 还没上市的那段不画
+      d+=(pen?'L':'M')+X(i).toFixed(1)+' '+Y(v).toFixed(1); pen=true;
+    }
+    const p=el('path',{d,fill:'none',stroke:L.color,'stroke-width':L.w,'stroke-linejoin':'round'});
+    if(L.dash) p.setAttribute('stroke-dasharray',L.dash);
+    if(L.op) p.setAttribute('opacity',L.op);
+    svg.appendChild(p);
+  });
+  // 末端直标
+  const placed=[];
+  vis.map(L=>{ let last=null; for(let i=n-1;i>=0;i--) if(okv(L.nav[i])){ last=L.nav[i]; break; }
+       return {...L, last, y: last==null?0:Y(last)}; })
+     .filter(L=>L.last!=null).sort((a,b)=>a.y-b.y).forEach(L=>{
+    let y=L.y; while(placed.some(v=>Math.abs(v-y)<11)) y+=11;
+    placed.push(y);
+    svg.appendChild(txt(W-PADR+6, y+3.5, L.last>=10?L.last.toFixed(0)+'×':L.last.toFixed(2)+'×',
+      {fill:L.color,'font-size':11,'font-family':'var(--num)','font-weight':L.code==='__S'?600:400}));
+  });
+
+  // 轮动色带
+  const ribY=PADT+plotH+8;
+  const rg=el('g',{}); svg.appendChild(rg);
+  if(showRib){
+  rg.appendChild(el('rect',{x:PADL,y:ribY,width:W-PADL-PADR,height:ribH,fill:'#fff',opacity:.5}));
+  const step=(W-PADL-PADR)/(n-1);
+  for(let i=0;i<n;i++){
+    const h=R.holdS[i]||{}; const ks=Object.keys(h).sort((a,b)=>(a===CASH)-(b===CASH));
+    let row=0;
+    for(const c of ks){
+      const cnt=Math.round(h[c]*P.topK);
+      for(let k=0;k<cnt;k++){
+        rg.appendChild(el('rect',{x:X(i)-step/2, y:ribY+3+row*9, width:Math.max(step,0.7), height:7,
+          fill:colorOf(c), opacity:c===CASH?.32:.9}));
+        row++;
+      }
+    }
+  }
+  rg.appendChild(el('rect',{x:PADL,y:ribY,width:W-PADL-PADR,height:ribH,fill:'none',stroke:RULE2}));
+  rg.appendChild(txt(PADL-7, ribY+ribH/2+3.5, R.awOn?'轮动腿':'持仓',{fill:INK3,'font-size':10,'text-anchor':'end'}));
+  }
+
+  // 敞口带：开了敞口调节才画
+  if(expoH){
+    const eh=13, ey=ribY+ribH+3;
+    const eg=el('g',{}); svg.appendChild(eg);
+    const top=Math.max(1, R.maxExpo||1);
+    let d='M'+X(0)+' '+(ey+eh);
+    for(let i=0;i<n;i++) d+='L'+X(i).toFixed(1)+' '+(ey+eh-eh*((R.expoS[i]!==undefined?R.expoS[i]:1)/top)).toFixed(1);
+    d+='L'+X(n-1)+' '+(ey+eh)+'Z';
+    eg.appendChild(el('path',{d,fill:INK,opacity:.22}));
+    if(top>1.01){ const y1=ey+eh-eh*(1/top);   // 100% 那条线，越过它就是融资
+      eg.appendChild(el('line',{x1:PADL,x2:W-PADR,y1,y2:y1,stroke:VERM,'stroke-width':1,'stroke-dasharray':'3 3',opacity:.7}));
+      eg.appendChild(txt(W-PADR+5, y1+3.5, '100%',{fill:VERM,'font-size':9,'font-family':'var(--num)'})); }
+    eg.appendChild(el('line',{x1:PADL,x2:W-PADR,y1:ey+eh,y2:ey+eh,stroke:RULE2}));
+    eg.appendChild(txt(PADL-7, ey+eh, '敞口',{fill:INK3,'font-size':10,'text-anchor':'end'}));
+  }
+
+  // 十字光标
+  const cross=el('line',{x1:0,x2:0,y1:PADT,y2:PADT+plotH,stroke:INK,'stroke-width':1,opacity:0});
+  svg.appendChild(cross);
+  const tip=document.getElementById('navTip');
+  const hit=el('rect',{x:PADL,y:PADT,width:W-PADL-PADR,height:plotH+ribH+8+expoH,fill:'transparent'});
+  svg.appendChild(hit);
+  hit.addEventListener('mousemove',e=>{
+    const r=svg.getBoundingClientRect(), sx=(e.clientX-r.left)*W/r.width;
+    const i=clamp(Math.round((sx-PADL)/(W-PADL-PADR)*(n-1)),0,n-1);
+    cross.setAttribute('x1',X(i)); cross.setAttribute('x2',X(i)); cross.setAttribute('opacity',.35);
+    const h=R.holdS[i]||{};
+    const rows=vis.filter(L=>okv(L.nav[i]))
+      .map(L=>`<tr><td><i style="background:${L.color}"></i>${L.name}</td><td>${L.nav[i].toFixed(2)}×</td></tr>`).join('');
+    const hold=Object.keys(h).map(c=>c===CASH?'现金':byCode[c].name).join('、');
+    tip.innerHTML=`<div class="d">${fmtD(R.dates[i])}</div><table>${rows}</table>
+      <div class="d" style="margin:4px 0 0">持仓 ${hold||'—'}</div>`;
+    tip.classList.add('on');
+    const tw=tip.offsetWidth, px=X(i)*r.width/W;
+    tip.style.left=clamp(px+12, 4, r.width-tw-4)+'px';
+    tip.style.top=Math.max(4,(e.clientY-r.top)-tip.offsetHeight-12)+'px';
+  });
+  hit.addEventListener('mouseleave',()=>{ tip.classList.remove('on'); cross.setAttribute('opacity',0); });
+
+  // 横向拖一段＝选回测区间
+  const band=el('rect',{y:PADT,height:plotH,fill:VERM,opacity:.1,width:0,x:PADL});
+  svg.insertBefore(band, svg.firstChild.nextSibling);
+  const xToI = ev => { const r=svg.getBoundingClientRect(), sx=(ev.clientX-r.left)*W/r.width;
+    return clamp(Math.round((sx-PADL)/(W-PADL-PADR)*(n-1)),0,n-1); };
+  let dragFrom=null;
+  hit.addEventListener('pointerdown',e=>{
+    dragFrom=xToI(e); try{ hit.setPointerCapture(e.pointerId); }catch(_){} e.preventDefault(); });
+  hit.addEventListener('pointermove',e=>{
+    if(dragFrom===null) return;
+    const i=xToI(e), a=Math.min(i,dragFrom), b=Math.max(i,dragFrom);
+    band.setAttribute('x',X(a)); band.setAttribute('width',Math.max(X(b)-X(a),0));
+  });
+  const endDrag=e=>{
+    if(dragFrom===null) return;
+    const i=xToI(e), a=Math.min(i,dragFrom), b=Math.max(i,dragFrom);
+    dragFrom=null; band.setAttribute('width',0);
+    try{ hit.releasePointerCapture(e.pointerId); }catch(_){}
+    if(b-a<8) return;
+    P.start=fmtD(R.dates[a]); P.end=fmtD(R.dates[b]);
+    run(); drawBrush(); syncDateInputs(); paintPresetStats();
+  };
+  hit.addEventListener('pointerup',endDrag);
+  hit.addEventListener('pointercancel',()=>{ dragFrom=null; band.setAttribute('width',0); });
+  if(!host._dbl){ host._dbl=1; host.addEventListener('dblclick',()=>applyQuick('all')); }
+
+  // 图例（对比度不足的色位靠文字直标补足）
+  const lg=document.getElementById('navLegend');
+  const chip=(k,style,label,on)=>
+    `<button type="button" data-h="${k}" aria-pressed="${on}"><i style="${style}"></i>${label}</button>`;
+  lg.innerHTML = chip('__S',`background:${INK};height:3px`, mainName, !HID.has('__S'))
+    + (active.length>1 ? (
+        (rotShare>0?chip('__R',`background:${INK};opacity:.6`,'只跑轮动',!HID.has('__R')):'')
+        + (P.tuShare>0?chip('__T',`background:${VERM}`,'只做海龟',!HID.has('__T')):'')
+        + (P.awShare>0?chip('__A',`background:${JADE}`,'只做底仓',!HID.has('__A')):'')) : '')
+    + `<button type="button" class="dash" data-h="__B" aria-pressed="${!HID.has('__B')}"><i></i>${benchName()}</button>`
+    + `<label style="margin-left:auto;display:inline-flex;gap:6px;align-items:center;cursor:pointer">
+         <input type="checkbox" id="tgLog" ${P.logY?'checked':''} style="accent-color:${INK}">对数纵轴</label>`;
+  const kg=document.getElementById('navKeys');
+  kg.innerHTML = `<span class="key klab">色带／标的</span>`
+    + P.pool.map(c=>chip('a:'+c,`background:${colorOf(c)}`, byCode[c].name, SHOWA.has(c))).join('')
+    + `<span class="key"><i style="background:${INK3};opacity:.4"></i>现金</span>`
+    + `<label style="margin-left:auto;display:inline-flex;gap:6px;align-items:center;cursor:pointer">
+         <input type="checkbox" id="tgAssets" ${SHOWA.size?'checked':''} style="accent-color:${INK}">画出各标的净值</label>`;
+  kg.onclick=e=>{ const b=e.target.closest('button[data-h]'); if(b) toggleAsset(b.dataset.h.slice(2)); };
+  kg.querySelector('#tgAssets').onchange=e=>{
+    SHOWA = e.target.checked ? new Set(P.pool) : new Set(); drawNav(); };
+  lg.onclick=e=>{
+    const b=e.target.closest('button[data-h]'); if(!b) return;
+    const k=b.dataset.h;
+    if(k.startsWith('a:')) toggleAsset(k.slice(2)); else toggleHid(k);
+  };
+  lg.querySelector('#tgLog').onchange=e=>{P.logY=e.target.checked; drawNav()};
+  document.getElementById('navNote').textContent =
+    `${fmtD(R.t0d)} 至 ${fmtD(R.t1d)}　共 ${R.navS.length} 个交易日　净值以起点重新归 1`;
+}
+
+/* ── 全期概览刷：拖两端手柄改回测区间 ───────────────────────── */
+let BR=null, brKey='', BRG=null, brMode=null, brGrab=0;
+function brushData(){
+  const key=P.bench+'|'+P.pool.join();
+  if(BR && key===brKey) return BR;
+  brKey=key;
+  const codes = P.bench==='EW' ? P.pool : [P.bench];
+  const dates=[], nav=[];
+  let v=1, prev=null;
+  for(let i=0;i<CAL.length;i++){
+    const ok=codes.every(c=>byCode[c].px[i]>0);
+    if(!ok){ prev=null; continue; }
+    if(prev!==null){
+      let r=0; for(const c of codes) r+=(byCode[c].px[i]/byCode[c].px[prev]-1)/codes.length;
+      v*=1+r;
+    }
+    prev=i; dates.push(CAL[i]); nav.push(v);
+  }
+  BR={dates,nav};
+  return BR;
+}
+function drawBrush(){
+  const host=document.getElementById('brushWrap'), svg=document.getElementById('brushSvg');
+  const d=brushData(); if(!d.dates.length) return;
+  const W=host.clientWidth, H=46, PADL=46, PADR=58, PADT=7, PADB=12;
+  const plotH=H-PADT-PADB;
+  svg.setAttribute('viewBox',`0 0 ${W} ${H}`); svg.setAttribute('height',H); clear(svg);
+  const n=d.dates.length, X=i=>PADL+(W-PADL-PADR)*(i/(n-1));
+  const lo=Math.min(...d.nav), hi=Math.max(...d.nav);
+  const Y=v=>PADT+plotH*(1-(Math.log(v)-Math.log(lo))/(Math.log(hi)-Math.log(lo)||1));
+  let path=''; for(let i=0;i<n;i++) path+=(i?'L':'M')+X(i).toFixed(1)+' '+Y(d.nav[i]).toFixed(1);
+  svg.appendChild(el('path',{d:path,fill:'none',stroke:INK3,'stroke-width':1}));
+  const yt=yearTicks(d.dates);
+  const ev0=Math.max(1,Math.ceil(30/Math.max(1,(W-PADL-PADR)/Math.max(1,yt.length))));
+  yt.forEach((t,k)=>{
+    svg.appendChild(el('line',{x1:X(t.i),x2:X(t.i),y1:PADT,y2:PADT+plotH,stroke:RULE}));
+    if(k%ev0===0) svg.appendChild(txt(X(t.i),H-3,t.y.slice(2),{fill:INK3,'font-size':9,'text-anchor':'middle','font-family':'var(--num)'}));
+  });
+  const s8=P.start.replace(/-/g,''), e8=P.end.replace(/-/g,'');
+  let ia=0; while(ia<n-1 && d.dates[ia]<s8) ia++;
+  let ib=n-1; while(ib>0 && d.dates[ib]>e8) ib--;
+  svg.appendChild(el('rect',{x:PADL,y:PADT,width:Math.max(X(ia)-PADL,0),height:plotH,fill:PAPER3,opacity:.8}));
+  svg.appendChild(el('rect',{x:X(ib),y:PADT,width:Math.max(W-PADR-X(ib),0),height:plotH,fill:PAPER3,opacity:.8}));
+  svg.appendChild(el('rect',{x:X(ia),y:PADT,width:Math.max(X(ib)-X(ia),1),height:plotH,fill:'none',stroke:INK,'stroke-width':1}));
+  [ia,ib].forEach(ix=>{
+    const x=X(ix);
+    svg.appendChild(el('rect',{x:x-3.5,y:PADT,width:7,height:plotH,fill:INK,opacity:.9,rx:1}));
+    svg.appendChild(el('line',{x1:x,x2:x,y1:PADT+5,y2:PADT+plotH-5,stroke:PAPER2,'stroke-width':1}));
+  });
+  svg.appendChild(txt(PADL-7, PADT+plotH/2+3.5,'区间',{fill:INK3,'font-size':10,'text-anchor':'end'}));
+  svg.appendChild(txt(W-PADR+6, PADT+plotH/2+3.5, `${d.dates[ia].slice(0,4)}–${d.dates[ib].slice(0,4)}`,
+    {fill:INK2,'font-size':10,'font-family':'var(--num)'}));
+
+  // 拖拽状态挂在模块级：commit 会重画整条轨道，状态放闭包里会被新闭包顶掉，一动就断
+  BRG={n, ia, ib, dates:d.dates, W, PADL, PADR, svg};
+  if(!svg._wired){
+    svg._wired=1;
+    const toI = ev => {
+      const g=BRG; if(!g) return 0;
+      const r=g.svg.getBoundingClientRect(), sx=(ev.clientX-r.left)*g.W/r.width;
+      return clamp(Math.round((sx-g.PADL)/(g.W-g.PADL-g.PADR)*(g.n-1)),0,g.n-1);
+    };
+    const gx = i => BRG.PADL+(BRG.W-BRG.PADL-BRG.PADR)*(i/(BRG.n-1));
+    const commit=(a,b)=>{
+      const g=BRG;
+      a=clamp(a,0,g.n-1); b=clamp(b,0,g.n-1);
+      if(b-a<20) return;
+      const ns=fmtD(g.dates[a]), ne=fmtD(g.dates[b]);
+      if(ns===P.start && ne===P.end) return;
+      P.start=ns; P.end=ne;
+      run(); drawBrush(); syncDateInputs();
+    };
+    svg.addEventListener('pointerdown', ev=>{
+      const g=BRG, i=toI(ev);
+      const dA=Math.abs(gx(i)-gx(g.ia)), dB=Math.abs(gx(i)-gx(g.ib));
+      if(dA<11 || dB<11) brMode = dA<=dB ? 'a' : 'b';
+      else if(i>g.ia && i<g.ib){ brMode='pan'; brGrab=i; }
+      else { brMode = i<g.ia ? 'a' : 'b'; commit(i<g.ia?i:g.ia, i<g.ia?g.ib:i); }
+      try{ svg.setPointerCapture(ev.pointerId); }catch(e){}
+      ev.preventDefault();
+    });
+    svg.addEventListener('pointermove', ev=>{
+      if(!brMode) return;
+      ev.preventDefault();
+      const g=BRG, i=toI(ev);
+      if(brMode==='a') commit(Math.min(i,g.ib-21), g.ib);
+      else if(brMode==='b') commit(g.ia, Math.max(i,g.ia+21));
+      else if(brMode==='pan'){ const sh=i-brGrab; if(sh){ brGrab=i; commit(g.ia+sh, g.ib+sh); } }
+    });
+    const stop=ev=>{
+      if(!brMode) return;
+      brMode=null;
+      try{ svg.releasePointerCapture(ev.pointerId); }catch(e){}
+      paintPresetStats();
+    };
+    svg.addEventListener('pointerup', stop);
+    svg.addEventListener('pointercancel', stop);
+    svg.addEventListener('lostpointercapture', ()=>{ brMode=null; });
+  }
+}
+function syncDateInputs(){
+  const a=document.getElementById('dStart'), b=document.getElementById('dEnd');
+  if(a) a.value=P.start; if(b) b.value=P.end;
+  document.querySelectorAll('#quickRange button').forEach((el,i)=>
+    el.setAttribute('aria-pressed', isQuick(QUICK[i])));
+}
+
+/* ── 回撤 ────────────────────────────────────────────────────── */
+function drawDD(){
+  const host=document.getElementById('ddPlot'), svg=document.getElementById('ddSvg');
+  const W=host.clientWidth, H=170, PADT=10, PADB=20, PADL=46, PADR=58, plotH=H-PADT-PADB;
+  svg.setAttribute('viewBox',`0 0 ${W} ${H}`); svg.setAttribute('height',H); clear(svg);
+  const s=R.S.ddS, b=R.B.ddS, n=s.length, X=i=>PADL+(W-PADL-PADR)*(i/(n-1));
+  const lo=Math.min(-0.05, Math.min(...s), Math.min(...b))*1.06;
+  const Y=v=>PADT+plotH*(v-0)/(lo-0);
+  niceLin(lo,0,4).forEach(v=>{
+    svg.appendChild(el('line',{x1:PADL,x2:W-PADR,y1:Y(v),y2:Y(v),stroke:v===0?RULE2:RULE}));
+    svg.appendChild(txt(PADL-7,Y(v)+3.5,(v*100).toFixed(0)+'%',{fill:INK3,'font-size':10,'text-anchor':'end','font-family':'var(--num)'}));
+  });
+  const yt2=yearTicks(R.dates);
+  const ev2=Math.max(1, Math.ceil(34/Math.max(1,(W-PADL-PADR)/Math.max(1,yt2.length))));
+  yt2.forEach((t,k)=>{
+    svg.appendChild(el('line',{x1:X(t.i),x2:X(t.i),y1:PADT,y2:PADT+plotH,stroke:RULE}));
+    if(k%ev2===0) svg.appendChild(txt(X(t.i),H-6,t.y,{fill:INK3,'font-size':10,'text-anchor':'middle','font-family':'var(--num)'}));
+  });
+  let d='M'+X(0)+' '+Y(0); for(let i=0;i<n;i++) d+='L'+X(i).toFixed(1)+' '+Y(s[i]).toFixed(1);
+  d+='L'+X(n-1)+' '+Y(0)+'Z';
+  svg.appendChild(el('path',{d,fill:VERM,opacity:.16}));
+  let bd=''; for(let i=0;i<n;i++) bd+=(i?'L':'M')+X(i).toFixed(1)+' '+Y(b[i]).toFixed(1);
+  svg.appendChild(el('path',{d:bd,fill:'none',stroke:BENCH,'stroke-width':1.2,'stroke-dasharray':'4 3'}));
+  let sd=''; for(let i=0;i<n;i++) sd+=(i?'L':'M')+X(i).toFixed(1)+' '+Y(s[i]).toFixed(1);
+  svg.appendChild(el('path',{d:sd,fill:'none',stroke:VERM,'stroke-width':1.6}));
+  // 最深回撤直标
+  const at=R.S.mddAt;
+  svg.appendChild(el('circle',{cx:X(at),cy:Y(s[at]),r:3.2,fill:VERM,stroke:PAPER2,'stroke-width':1.5}));
+  const lx=clamp(X(at)+8, PADL, W-PADR-90);
+  svg.appendChild(txt(lx, Y(s[at])+13, `最深 ${pct(-R.S.mdd,1)} · ${fmtD(R.dates[at]).slice(0,7)}`,
+    {fill:VERM,'font-size':10.5,'font-family':'var(--num)'}));
+  document.getElementById('ddNote').textContent=`策略实线 · ${benchName()}虚线`;
+
+  const tip=document.getElementById('ddTip');
+  const hit=el('rect',{x:PADL,y:PADT,width:W-PADL-PADR,height:plotH,fill:'transparent'});
+  svg.appendChild(hit);
+  hit.addEventListener('mousemove',e=>{
+    const r=svg.getBoundingClientRect(), sx=(e.clientX-r.left)*W/r.width;
+    const i=clamp(Math.round((sx-PADL)/(W-PADL-PADR)*(n-1)),0,n-1);
+    tip.innerHTML=`<div class="d">${fmtD(R.dates[i])}</div><table>
+      <tr><td><i style="background:${VERM}"></i>策略</td><td>${pct(s[i],1)}</td></tr>
+      <tr><td><i style="background:${BENCH}"></i>${benchName()}</td><td>${pct(b[i],1)}</td></tr></table>`;
+    tip.classList.add('on');
+    tip.style.left=clamp(X(i)*r.width/W+12,4,r.width-tip.offsetWidth-4)+'px';
+    tip.style.top='6px';
+  });
+  hit.addEventListener('mouseleave',()=>tip.classList.remove('on'));
+}
+
+/* ── 打分排行 ────────────────────────────────────────────────── */
+function drawScore(){
+  const host=document.getElementById('scorePlot'), svg=document.getElementById('scoreSvg');
+  const W=host.clientWidth, rowH=30, H=R.board.length*rowH+16, PADL=104, PADR=54, mid=PADL+(W-PADL-PADR)/2;
+  svg.setAttribute('viewBox',`0 0 ${W} ${H}`); svg.setAttribute('height',H); clear(svg);
+  const mx=Math.max(0.6, ...R.board.map(b=>Math.abs(b.score)))*1.12;
+  const half=(W-PADL-PADR)/2;
+  svg.appendChild(el('line',{x1:mid,x2:mid,y1:6,y2:H-10,stroke:RULE2}));
+  const held=Object.keys(R.lastHold||{});
+  R.board.forEach((b,i)=>{
+    const y=10+i*rowH, w=Math.abs(b.score)/mx*half, x=b.score>=0?mid:mid-w;
+    svg.appendChild(el('rect',{x, y:y+4, width:Math.max(w,1), height:13, rx:2,
+      fill:colorOf(b.code), opacity:held.includes(b.code)?.95:.42}));
+    svg.appendChild(txt(PADL-10, y+15, byCode[b.code].name,
+      {fill:held.includes(b.code)?INK:INK2,'font-size':12,'text-anchor':'end'}));
+    svg.appendChild(txt(PADL-10, y+26, byCode[b.code].tag, {fill:INK3,'font-size':9.5,'text-anchor':'end'}));
+    svg.appendChild(txt(W-PADR+8, y+15, (b.score>=0?'+':'−')+Math.abs(b.score).toFixed(2),
+      {fill:INK2,'font-size':11,'font-family':'var(--num)'}));
+    if(held.includes(b.code))
+      svg.appendChild(txt(W-PADR+8, y+26, '持有', {fill:INK3,'font-size':9.5}));
+  });
+  const tip=document.getElementById('scoreTip');
+  R.board.forEach((b,i)=>{
+    const y=10+i*rowH;
+    const hit=el('rect',{x:0,y,width:W,height:rowH,fill:'transparent'});
+    svg.appendChild(hit);
+    hit.addEventListener('mouseenter',e=>{
+      const zr=Object.entries(b.z).filter(([k])=>P.w[k]>0)
+        .map(([k,v])=>`<tr><td>${FLAB[k]}</td><td>${v>=0?'+':'−'}${Math.abs(v).toFixed(2)}</td></tr>`).join('');
+      tip.innerHTML=`<div class="d">${byCode[b.code].name} ${b.code}</div><table>${zr}
+        <tr><td style="padding-top:4px">趋势原值</td><td style="padding-top:4px">${isFinite(b.trend)?b.trend.toFixed(1):'—'}</td></tr>
+        <tr><td>${P.win.mom} 日涨幅</td><td>${isFinite(b.mom)?sPct(b.mom,1):'—'}</td></tr>
+        <tr><td>年化波动</td><td>${isFinite(b.vol)?pct(b.vol,1):'—'}</td></tr></table>`;
+      tip.classList.add('on');
+      const r=svg.getBoundingClientRect();
+      tip.style.left=clamp(PADL+10,4,r.width-tip.offsetWidth-4)+'px';
+      tip.style.top=(y+rowH)+'px';
+    });
+    hit.addEventListener('mouseleave',()=>tip.classList.remove('on'));
+  });
+}
+
+/* ── 池内相关性矩阵 ─────────────────────────────────────────── */
+function corrColor(v){
+  // 发散配色：负相关走蓝、正相关走红，0 附近是中性灰
+  const t=Math.max(-1,Math.min(1,v));
+  const mid=[240,239,236], pos=[227,73,72], neg=[42,120,214];
+  const e=Math.min(1, Math.abs(t)/0.9), tgt = t>=0?pos:neg;
+  return `rgb(${mid.map((m,i)=>Math.round(m+(tgt[i]-m)*e)).join(',')})`;
+}
+function drawCorr(){
+  const host=document.getElementById('corrPlot'), svg=document.getElementById('corrSvg');
+  if(!host||!svg||!R||!R.corrMat) return;
+  const M=R.corrMat, cs=R.codes, n=cs.length;
+  const W=Math.max(300, host.clientWidth), PADL=Math.min(104, Math.max(66, W*0.22)), PADT=27, PADR=6;
+  const cell=Math.min(58, Math.max(26, (W-PADL-PADR)/n));
+  const H=PADT+cell*n+6;
+  svg.setAttribute('viewBox',`0 0 ${W} ${H}`); svg.setAttribute('height',H); clear(svg);
+  cs.forEach((c,j)=>{
+    const x=PADL+cell*j+cell/2;
+    svg.appendChild(el('rect',{x:x-4.5,y:PADT-20,width:9,height:9,rx:1,fill:colorOf(c)}));
+    svg.appendChild(txt(x, PADT-6, byCode[c].name.replace('ETF','').slice(0,4),
+      {fill:INK3,'font-size':9.5,'text-anchor':'middle'}));
+  });
+  let worst=-2, wp='';
+  cs.forEach((a,i)=>{
+    const y=PADT+cell*i;
+    svg.appendChild(el('rect',{x:PADL-13,y:y+cell/2-4.5,width:9,height:9,rx:1,fill:colorOf(a)}));
+    svg.appendChild(txt(PADL-17, y+cell/2+3.5, byCode[a].name, {fill:INK2,'font-size':11,'text-anchor':'end'}));
+    cs.forEach((b,j)=>{
+      const v=M[i][j], x=PADL+cell*j;
+      if(v==null){
+        svg.appendChild(el('rect',{x:x+1,y:y+1,width:cell-2,height:cell-2,fill:'none',stroke:RULE,'stroke-dasharray':'2 2'}));
+        svg.appendChild(txt(x+cell/2,y+cell/2+3.5,'—',{fill:INK3,'font-size':10,'text-anchor':'middle'}));
+        return;
+      }
+      svg.appendChild(el('rect',{x:x+1,y:y+1,width:cell-2,height:cell-2,fill:i===j?PAPER3:corrColor(v)}));
+      if(i!==j && v>worst){ worst=v; wp=byCode[a].name+' × '+byCode[b].name; }
+      svg.appendChild(txt(x+cell/2, y+cell/2+3.5, i===j?'—':(v<0?'−':'')+Math.abs(v).toFixed(2).slice(1),
+        {fill: Math.abs(v)>0.55?'#fff':INK,'font-size':Math.min(11,cell*0.33),
+         'text-anchor':'middle','font-family':'var(--num)'}));
+    });
+  });
+  const nt=document.getElementById('corrNote');
+  if(nt) nt.textContent = worst>-2 ? `最像的一对：${wp}　ρ=${worst.toFixed(2)}` : '';
+}
+
+/* ── 分年度 ──────────────────────────────────────────────────── */
+function drawYears(){
+  const host=document.getElementById('yrPlot'), svg=document.getElementById('yrSvg');
+  const Y=R.years, W=host.clientWidth, H=210, PADT=14, PADB=26, PADL=46, PADR=8;
+  const plotH=H-PADT-PADB;
+  svg.setAttribute('viewBox',`0 0 ${W} ${H}`); svg.setAttribute('height',H); clear(svg);
+  const lo=Math.min(-0.02,...Y.map(y=>Math.min(y.s,y.b)))*1.15, hi=Math.max(0.02,...Y.map(y=>Math.max(y.s,y.b)))*1.15;
+  const yy=v=>PADT+plotH*(1-(v-lo)/(hi-lo));
+  niceLin(lo,hi,5).forEach(v=>{
+    svg.appendChild(el('line',{x1:PADL,x2:W-PADR,y1:yy(v),y2:yy(v),stroke:Math.abs(v)<1e-9?RULE2:RULE}));
+    svg.appendChild(txt(PADL-7,yy(v)+3.5,(v*100).toFixed(0)+'%',{fill:INK3,'font-size':10,'text-anchor':'end','font-family':'var(--num)'}));
+  });
+  const band=(W-PADL-PADR)/Y.length, bw=Math.min(20,(band-8)/2);
+  Y.forEach((y,i)=>{
+    const cx=PADL+band*(i+0.5);
+    [[y.s,INK,-1],[y.b,BENCH,1]].forEach(([v,col,side])=>{
+      const y0=yy(0), y1=yy(v);
+      svg.appendChild(el('rect',{x:cx+side*2-(side<0?bw:0), y:Math.min(y0,y1), width:bw,
+        height:Math.max(Math.abs(y1-y0),1), rx:2, fill:col, opacity:side<0?1:.42}));
+    });
+    svg.appendChild(txt(cx, H-12, y.y, {fill:INK3,'font-size':10,'text-anchor':'middle','font-family':'var(--num)'}));
+    const lx=cx+2-bw/2, ly=y.s>=0? yy(y.s)-5 : yy(y.s)+12;
+    svg.appendChild(txt(lx, ly, sPct(y.s, Math.abs(y.s)<0.095?1:0),
+      {fill:y.s>=0?INK:VERM,'font-size':10,'text-anchor':'middle','font-family':'var(--num)'}));
+  });
+  // 表
+  const t=document.getElementById('yrTable');
+  t.innerHTML=`<thead><tr><th>年</th><th>策略</th><th>${benchName()}</th><th>超额</th><th>年内最大回撤</th></tr></thead>
+   <tbody>${Y.map(y=>`<tr><td>${y.y}</td>
+     <td class="${y.s>=0?'pos':'neg'}">${sPct(y.s,1)}</td>
+     <td class="${y.b>=0?'pos':'neg'}">${sPct(y.b,1)}</td>
+     <td class="${y.s-y.b>=0?'pos':'neg'}">${sPct(y.s-y.b,1)}</td>
+     <td>${pct(-y.mdd,1)}</td></tr>`).join('')}</tbody>
+   <tfoot><tr><td>全期</td><td>${sPct(R.S.total,1)}</td><td>${sPct(R.B.total,1)}</td>
+     <td>${sPct(R.S.total-R.B.total,1)}</td><td>${pct(-R.S.mdd,1)}</td></tr></tfoot>`;
+}
+
+/* ── 指标 / 表 / 头部 ────────────────────────────────────────── */
+const FLAB={trend:'趋势得分',mom:'区间动量',rs:'风险调整动量',lowvol:'低波动',rev:'短期反转'};
+function benchName(){ return P.bench==='EW'?'池内等权':byCode[P.bench].name; }
+
+function paintStats(){
+  const S=R.S,B=R.B;
+  document.getElementById('stats').innerHTML=[
+    ['累计收益', sPct(S.total,1), `基准 ${sPct(B.total,0)}`],
+    ['年化收益', pct(S.cagr,2), `基准 ${pct(B.cagr,2)}`],
+    ['年化波动', pct(S.vol,2), `基准 ${pct(B.vol,2)}`],
+    ['夏普', num(S.sharpe,2), `基准 ${num(B.sharpe,2)}`],
+    ['最大回撤', pct(-S.mdd,2), `基准 ${pct(-B.mdd,1)}`],
+    ['卡玛比', num(S.calmar,2), '年化 ÷ 回撤'],
+    ['月度胜率', pct(R.monthWin,0), '按月赢基准'],
+    ['年换手率', num(R.turnPerYr,1)+' 倍', `${R.nRebal} 次调仓决策`],
+  ].concat(R.expoVaries?[['平均敞口', pct(R.avgExpo,0),
+      R.maxExpo>1.01?`最高 ${pct(R.maxExpo,0)}（融资）`:'其余在现金']]:[]).map(([k,v,s])=>`<div><dt>${k}</dt><dd>${v}<small>${s}</small></dd></div>`).join('');
+
+  const occ=Object.entries(R.occ).sort((a,b)=>b[1]-a[1]);
+  document.getElementById('occTable').innerHTML=
+   `<thead><tr><th>标的</th><th>占比</th><th>全期涨幅</th></tr></thead><tbody>${
+    occ.map(([c,v])=>{
+      const an=R.assetNav.find(a=>a.code===c);
+      return `<tr><td><i style="display:inline-block;width:8px;height:8px;border-radius:1px;margin-right:7px;background:${colorOf(c)};opacity:${c===CASH?.4:1}"></i>${
+        c===CASH?'现金':byCode[c].name}</td><td>${pct(v,1)}</td><td>${
+        an?`<span class="${an.nav[an.nav.length-1]>=1?'pos':'neg'}">${sPct(an.nav[an.nav.length-1]-1,0)}</span>`:'—'}</td></tr>`;
+    }).join('')}</tbody>`;
+
+  const rotShare2=Math.max(0,100-P.awShare-P.tuShare);
+  const legs=[];
+  if(rotShare2>0) legs.push(['轮动',R.rotS]);
+  if(R.tuOn) legs.push(['海龟',R.tuS]);
+  if(R.awOn) legs.push(['全天候',R.awS]);
+  document.getElementById('statNote').innerHTML = legs.length>1
+    ? legs.map(([n,st])=>`只做${n} 年化 ${pct(st.cagr,1)}／回撤 ${pct(-st.mdd,1)}`).join('　·　')
+    : '夏普用现金收益率作无风险利率';
+
+  // 头部
+  const h=R.lastHold||{}, ks=Object.keys(h);
+  const rotW=Math.max(0,100-P.awShare-P.tuShare)/100;
+  const rows=[];
+  if(rotW>0) for(const c of ks) rows.push({c, w:h[c]*rotW});
+  if(R.tuOn) for(const c in R.tuLast) rows.push({c, w:R.tuLast[c]*P.tuShare/100});
+  if(R.awOn) for(const c in R.awLast) rows.push({c, w:R.awLast[c]*P.awShare/100});
+  const merged={};
+  rows.forEach(r=>{ merged[r.c]=(merged[r.c]||0)+r.w; });
+  const order=Object.keys(merged).sort((a,b)=>merged[b]-merged[a]);
+  const shown=order.slice(0,4), restW=order.slice(4).reduce((a,c)=>a+merged[c],0);
+  document.getElementById('sigSwatch').innerHTML=order.map(c=>
+    `<i style="background:${colorOf(c)};opacity:${c===CASH?.4:1}"></i>`).join('')||'<i></i>';
+  const multi=R.awOn||R.tuOn;
+  document.getElementById('sigWho').innerHTML=(shown.map(c=>
+    `<span>${c===CASH?'现金':byCode[c].name}${multi?` <small style="font-size:.55em;color:var(--ink-3)">${(merged[c]*100).toFixed(0)}%</small>`:''}</span>`).join('')
+    + (order.length>4?`<span style="font-size:.6em;color:var(--ink-3)">另有 ${order.length-4} 项共 ${(restW*100).toFixed(0)}%</span>`:''))||'—';
+  document.getElementById('sigCap').textContent=`${fmtD(R.t1d)} 收盘后该持有`;
+  const top=R.board[0];
+  document.getElementById('sigMeta').textContent = multi
+    ? splitText().replace('当前配比：','')
+    : (ks.length? `最高分 ${byCode[top.code].name} ${top.score>=0?'+':'−'}${Math.abs(top.score).toFixed(2)}` : '');
+  document.getElementById('headStats').innerHTML=[
+    ['年化收益', pct(R.S.cagr,1)],['最大回撤', pct(-R.S.mdd,1)],['夏普', num(R.S.sharpe,2)],['累计', num(R.navS[R.navS.length-1],1)+'×']
+  ].map(([k,v])=>`<div><dt>${k}</dt><dd>${v}</dd></div>`).join('');
+}
+
+/* ── 控制台渲染 ──────────────────────────────────────────────── */
+function firstYear(c){ const px=byCode[c].px; for(let i=0;i<px.length;i++) if(px[i]>0) return CAL[i].slice(0,4); return ''; }
+function buildRail(){
+  document.getElementById('presets').innerHTML=
+    `<div class="phead"><b>方案</b><b>年化</b><b>回撤</b><b>卡玛</b></div>`
+    + PRESETS.map((pr,i)=>{
+      if(pr.g) return `<div class="pgrp">${pr.g}</div>`;
+      const st=PSTAT[i]||{};
+      return `<button type="button" class="prow" data-i="${i}" aria-pressed="${presetIdx===i}">
+        <span class="l1"><span class="nm">${pr.n}</span>
+          <span class="fig" data-f="c${i}">${st.c||'·'}</span>
+          <span class="fig" data-f="d${i}">${st.d||'·'}</span>
+          <span class="fig k" data-f="k${i}">${st.k||'·'}</span></span>
+        <span class="dsc">${pr.d}</span></button>`;
+    }).join('');
+  paintPresetStats();
+  document.getElementById('presets').onclick=e=>{
+    const b=e.target.closest('button'); if(!b) return;
+    presetIdx=+b.dataset.i;
+    Object.assign(P, JSON.parse(JSON.stringify(PRESETS[presetIdx].p)));
+    buildRail(); run(); paintExplain(); paintNow();
+  };
+
+  document.getElementById('pool').innerHTML=POOL_GROUPS.map(([gname,codes])=>{
+    const rows=codes.filter(c=>byCode[c]).map(c=>{
+      const a=byCode[c], on=P.pool.includes(c), lim=!on && P.pool.length>=8;
+      return `<label class="pick ${on?'on':''} ${lim?'off-limit':''}">
+        <input type="checkbox" value="${c}" ${on?'checked':''} ${lim?'disabled':''}>
+        <i class="dot" style="${on?`background:${colorOf(c)}`:''}"></i>
+        <span class="nm">${a.name}<em>${a.tag.split('·')[1]||a.tag}</em></span>
+        <span class="yr">${firstYear(c)}</span></label>`;
+    }).join('');
+    return `<div class="poolg">${gname}</div>${rows}`;
+  }).join('');
+  document.getElementById('pool').onchange=e=>{
+    unpick();
+    const c=e.target.value;
+    if(e.target.checked){ if(P.pool.length<8) P.pool.push(c); }
+    else { if(P.pool.length<=1) { e.target.checked=true; return; } P.pool=P.pool.filter(x=>x!==c); }
+    P.pool.sort((a,b)=>byCode[a].slot-byCode[b].slot);
+    P.topK=Math.min(P.topK,P.pool.length);
+    buildRail(); run();
+  };
+
+  const wsum=Object.values(P.w).reduce((a,b)=>a+b,0);
+  document.getElementById('weights').innerHTML=Object.keys(FLAB).map(k=>{
+    const share=wsum>0?P.w[k]/wsum:(k==='trend'?1:0);
+    return `<div class="sld"><div class="top"><span class="lbl"><b>${FLAB[k]}</b></span>
+      <span class="val">${(share*100).toFixed(0)}%</span></div>
+      <div class="sub">${WSUB[k]}</div>
+      <input type="range" min="0" max="100" step="5" value="${P.w[k]}" data-w="${k}">
+      <div class="wbar"><i style="width:${share*100}%"></i></div></div>`;
+  }).join('');
+
+  document.getElementById('windows').innerHTML=[
+    ['trend','趋势回归窗口','天，越长越钝'],['mom','动量区间','天'],
+    ['vol','波动窗口','天'],['rev','反转窗口','天']
+  ].map(([k,l,u])=>`<div class="sld"><div class="top"><span class="lbl">${l}</span>
+      <span class="val">${P.win[k]} ${u}</span></div>
+      <input type="range" min="${k==='rev'?2:5}" max="${k==='mom'?250:120}" step="${k==='rev'?1:5}" value="${P.win[k]}" data-win="${k}"></div>`).join('');
+
+  document.getElementById('exec1').innerHTML=`
+    <div class="sld"><div class="top"><span class="lbl">同时持有</span><span class="val">${P.topK} 只（各 ${(100/P.topK).toFixed(0)}%）</span></div>
+      <input type="range" min="1" max="${Math.min(4,P.pool.length)}" step="1" value="${P.topK}" data-k="1"></div>
+    <div class="fld" style="margin-bottom:11px"><label>调仓频率</label>
+      <div class="seg" id="segFreq">
+        ${[['D','每日'],['W','每周'],['M','每月'],['N','每 N 日']].map(([v,l])=>
+          `<button type="button" data-f="${v}" aria-pressed="${P.freq===v}">${l}</button>`).join('')}
+      </div></div>
+    ${P.freq==='N'?`<div class="sld"><div class="top"><span class="lbl">N</span><span class="val">${P.nDays} 天</span></div>
+      <input type="range" min="2" max="60" step="1" value="${P.nDays}" data-n="1"></div>`:''}
+    <div class="sld"><div class="top"><span class="lbl">换仓得分阈值</span>
+      <span class="val">${P.switchGap>0?('领先 '+P.switchGap.toFixed(2)+' 分才换'):'关'}</span></div>
+      <div class="sub">挑战者的得分要比在手的高出这么多才换，压掉第一第二名之间的反复横跳</div>
+      <input type="range" min="0" max="20" step="1" value="${Math.round(P.switchGap*10)}" data-sg="1"></div>
+    <div class="sld"><div class="top"><span class="lbl">换手缓冲带</span><span class="val">${P.buffer} 名</span></div>
+      <div class="sub">在手标的掉出前 ${P.topK}，但仍在前 ${P.topK+P.buffer} 名内就不换</div>
+      <input type="range" min="0" max="3" step="1" value="${P.buffer}" data-b="1"></div>
+    <div class="fld"><label>成交时点</label>
+      <div class="seg" id="segExec">
+        <button type="button" data-e="same" aria-pressed="${P.exec==='same'}">当日收盘</button>
+        <button type="button" data-e="next" aria-pressed="${P.exec==='next'}">次日收盘</button>
+      </div></div>`;
+
+  document.getElementById('exec2').innerHTML=`
+    <div class="sld"><div class="top"><span class="lbl">单边成本</span><span class="val">${P.costBps} bp</span></div>
+      <div class="sub">佣金＋滑点，按换手金额收</div>
+      <input type="range" min="0" max="30" step="1" value="${P.costBps}" data-c="1"></div>
+    <label class="chk"><input type="checkbox" id="absOn" ${P.absOn?'checked':''}>
+      <span>趋势转负就空仓<small>入选标的的趋势得分低于阈值时，那份仓位换成现金</small></span></label>
+    ${P.absOn?`<div class="sld"><div class="top"><span class="lbl">空仓阈值</span><span class="val">${P.absThresh}</span></div>
+      <input type="range" min="-40" max="40" step="5" value="${P.absThresh}" data-a="1"></div>`:''}
+    <div class="sld"><div class="top"><span class="lbl">现金年化</span><span class="val">${P.cashRate.toFixed(1)}%</span></div>
+      <div class="sub">同时用作夏普的无风险利率</div>
+      <input type="range" min="0" max="4" step="0.1" value="${P.cashRate}" data-cash="1"></div>`;
+
+  const off=v=>v>0?null:'关';
+  document.getElementById('risk').innerHTML=`
+    <div class="sld"><div class="top"><span class="lbl">波动率目标</span>
+      <span class="val">${off(P.volTarget)||('年化 '+P.volTarget+'%')}</span></div>
+      <div class="sub">拿近 ${P.volTgtWin} 日的实际波动跟目标比，超了降敞口、低了才可能加敞口</div>
+      <input type="range" min="0" max="30" step="1" value="${P.volTarget}" data-vt="1"></div>
+    ${P.volTarget>0?`<div class="sld"><div class="top"><span class="lbl">波动观测窗口</span>
+      <span class="val">${P.volTgtWin} 日</span></div>
+      <div class="sub">窗口越长敞口越稳、换手越低；20 日很灵敏但容易来回调仓</div>
+      <input type="range" min="10" max="120" step="5" value="${P.volTgtWin}" data-vw="1"></div>`:''}
+    <div class="sld"><div class="top"><span class="lbl">敞口上限</span>
+      <span class="val">${P.leverMax<=100?'不融资（100%）':P.leverMax+'%'}</span></div>
+      <div class="sub">${P.volTarget>0?'波动明显低于目标时才会加到 100% 以上，越颠越往回收':'要先开波动率目标，这里才起作用'}</div>
+      <input type="range" min="100" max="200" step="10" value="${P.leverMax}" data-lm="1"></div>
+    ${P.leverMax>100?`<div class="sld"><div class="top"><span class="lbl">融资年利率</span>
+      <span class="val">${P.marginRate.toFixed(1)}%</span></div>
+      <div class="sub">只对超过 100% 的那部分计息</div>
+      <input type="range" min="0" max="100" step="5" value="${Math.round(P.marginRate*10)}" data-mr="1"></div>`:''}
+    <div class="sld"><div class="top"><span class="lbl">回撤刹车</span>
+      <span class="val">${off(P.ddBrake)||('跌 '+P.ddBrake+'% 清仓')}</span></div>
+      <div class="sub">按满仓影子净值算回撤，回撤收窄到一半才回场</div>
+      <input type="range" min="0" max="40" step="5" value="${P.ddBrake}" data-db="1"></div>
+    <div class="sld"><div class="top"><span class="lbl">均线过滤</span>
+      <span class="val">${off(P.maWin)||(P.maWin+' 日线之上才买')}</span></div>
+      <input type="range" min="0" max="250" step="10" value="${P.maWin}" data-ma="1"></div>
+    <div class="sld"><div class="top"><span class="lbl">最小持有期</span>
+      <span class="val">${off(P.minHold)||(P.minHold+' 个交易日')}</span></div>
+      <div class="sub">买进去至少端这么久，压掉来回打脸的换手</div>
+      <input type="range" min="0" max="60" step="1" value="${P.minHold}" data-mh="1"></div>
+    <div class="sld"><div class="top"><span class="lbl">分散约束</span>
+      <span class="val">${off(P.corrCap)||('相关系数 ≤ '+P.corrCap.toFixed(2))}</span></div>
+      <div class="sub">跟已选标的近 ${P.corrWin} 日相关性过高的不同时持，名额空着放现金</div>
+      <input type="range" min="0" max="95" step="5" value="${Math.round(P.corrCap*100)}" data-cc="1"></div>`;
+
+  document.getElementById('tuBox').innerHTML=`
+    <div class="sld"><div class="top"><span class="lbl">海龟占比</span>
+      <span class="val">${P.tuShare===0?'不用海龟':P.tuShare+'%'}</span></div>
+      <div class="sub">${splitText()}</div>
+      <input type="range" min="0" max="100" step="5" value="${P.tuShare}" data-tu="1">
+      <div class="wbar"><i style="width:${P.tuShare}%"></i></div></div>
+    ${P.tuShare>0?`
+    <div class="sld"><div class="top"><span class="lbl">入场</span>
+      <span class="val">破 ${P.tuIn} 日新高</span></div>
+      <input type="range" min="5" max="120" step="5" value="${P.tuIn}" data-ti="1"></div>
+    <div class="sld"><div class="top"><span class="lbl">出场</span>
+      <span class="val">破 ${P.tuOut} 日新低</span></div>
+      <input type="range" min="3" max="60" step="1" value="${P.tuOut}" data-to="1"></div>
+    <div class="sld"><div class="top"><span class="lbl">ATR 止损</span>
+      <span class="val">${P.tuStop>0?P.tuStop.toFixed(1)+' 倍 ATR':'关'}</span></div>
+      <div class="sub">从入场价往下 ${P.tuStop>0?P.tuStop.toFixed(1):'—'} 倍 ATR（${P.tuAtr} 日）就砍</div>
+      <input type="range" min="0" max="40" step="5" value="${Math.round(P.tuStop*10)}" data-ts="1"></div>
+    <div class="sld"><div class="top"><span class="lbl">单标的风险预算</span>
+      <span class="val">${P.tuRisk.toFixed(1)}%</span></div>
+      <div class="sub">一个 ATR 的波动最多亏掉净值的这么多，越小仓位越轻</div>
+      <input type="range" min="1" max="30" step="1" value="${Math.round(P.tuRisk*10)}" data-tr="1"></div>`:''}`;
+
+  document.getElementById('awBox').innerHTML=`
+    <div class="sld"><div class="top"><span class="lbl">底仓占比</span>
+      <span class="val">${P.awShare===0?'不用底仓':P.awShare+'%'}</span></div>
+      <div class="sub">${splitText()}</div>
+      <input type="range" min="0" max="100" step="5" value="${P.awShare}" data-aw="1">
+      <div class="wbar"><i style="width:${P.awShare}%"></i></div></div>
+    ${P.awShare>0?`
+    <div class="fld" style="margin-bottom:10px"><label>底仓成分</label>
+      <div class="chips" id="awPool">${AW_LEGS.map(([c,l])=>
+        `<button type="button" data-c="${c}" aria-pressed="${P.awPool.includes(c)}">${l}<span style="color:var(--ink-3);font-size:10px">·${firstYear(c)}</span></button>`).join('')}</div></div>
+    <div class="fld" style="margin-bottom:10px"><label>配权方式</label>
+      <div class="seg" id="awMode">
+        <button type="button" data-m="rp" aria-pressed="${P.awMode==='rp'}">风险平价</button>
+        <button type="button" data-m="ew" aria-pressed="${P.awMode==='ew'}">等权</button>
+      </div></div>
+    <div class="fld"><label>再平衡</label>
+      <div class="seg" id="awFreq">${[['M','每月'],['Q','每季'],['Y','每年']].map(([v,l])=>
+        `<button type="button" data-q="${v}" aria-pressed="${P.awFreq===v}">${l}</button>`).join('')}</div></div>`:''}`;
+
+  const lo=fmtD(CAL[0]), hi=fmtD(CAL[CAL.length-1]);
+  document.getElementById('range').innerHTML=`
+    <div class="chips" id="quickRange">${QUICK.map(q=>
+      `<button type="button" data-q="${q.k}" aria-pressed="${isQuick(q)}">${q.n}</button>`).join('')}</div>
+    <div class="row"><div class="fld"><label>起始</label>
+        <input type="date" id="dStart" value="${P.start}" min="${lo}" max="${hi}"></div>
+      <div class="fld"><label>结束</label>
+        <input type="date" id="dEnd" value="${P.end}" min="${lo}" max="${hi}"></div></div>
+    <p class="hint" style="margin:-3px 0 10px">也可以直接在净值图上横向拖一段来选区间，双击图回到全期。</p>
+    <div class="fld"><label>基准</label><select id="selBench">
+      ${ASSETS.map(a=>`<option value="${a.code}" ${P.bench===a.code?'selected':''}>${a.name}</option>`).join('')}
+      <option value="EW" ${P.bench==='EW'?'selected':''}>池内等权买入持有</option></select></div>`;
+
+  document.getElementById('quickRange').onclick=e=>{
+    const b=e.target.closest('button'); if(!b) return; applyQuick(b.dataset.q); };
+  const awp=document.getElementById('awPool');
+  if(awp) awp.onclick=e=>{
+    const b=e.target.closest('button'); if(!b) return; unpick();
+    const c=b.dataset.c;
+    if(P.awPool.includes(c)){ if(P.awPool.length<=1) return; P.awPool=P.awPool.filter(x=>x!==c); }
+    else P.awPool.push(c);
+    P.awPool.sort((a,b)=>byCode[a].slot-byCode[b].slot);
+    buildRail(); run(); paintPresetStats(true);
+  };
+  const awm=document.getElementById('awMode');
+  if(awm) awm.onclick=e=>{ const b=e.target.closest('button'); if(!b) return; unpick();
+    P.awMode=b.dataset.m; buildRail(); run(); paintPresetStats(true); };
+  const awf=document.getElementById('awFreq');
+  if(awf) awf.onclick=e=>{ const b=e.target.closest('button'); if(!b) return; unpick();
+    P.awFreq=b.dataset.q; buildRail(); run(); paintPresetStats(true); };
+
+  const rail=document.getElementById('rail');
+  rail.oninput=e=>{
+    const t=e.target;
+    if(t.id==='dStart'||t.id==='dEnd'){ readDates(); return; }
+    unpick();
+    if(t.dataset.w!==undefined){ P.w[t.dataset.w]=+t.value; syncWeights(); schedule(); }
+    else if(t.dataset.win!==undefined){ P.win[t.dataset.win]=+t.value; label(t,`${t.value} 天`); schedule(); }
+    else if(t.dataset.k){ P.topK=+t.value; label(t,`${t.value} 只（各 ${(100/+t.value).toFixed(0)}%）`); syncBuffer(); schedule(); }
+    else if(t.dataset.n){ P.nDays=+t.value; label(t,`${t.value} 天`); schedule(); }
+    else if(t.dataset.b){ P.buffer=+t.value; label(t,`${t.value} 名`); syncBuffer(); schedule(); }
+    else if(t.dataset.c){ P.costBps=+t.value; label(t,`${t.value} bp`); schedule(); }
+    else if(t.dataset.a){ P.absThresh=+t.value; label(t,t.value); schedule(); }
+    else if(t.dataset.cash){ P.cashRate=+t.value; label(t,(+t.value).toFixed(1)+'%'); schedule(); }
+    else if(t.dataset.vw){ P.volTgtWin=+t.value; label(t, t.value+' 日'); schedule(); }
+    else if(t.dataset.sg){ P.switchGap=(+t.value)/10; label(t, P.switchGap>0?('领先 '+P.switchGap.toFixed(2)+' 分才换'):'关'); schedule(); }
+    else if(t.dataset.lm){ const was=P.leverMax>100; P.leverMax=+t.value;
+      label(t, P.leverMax<=100?'不融资（100%）':P.leverMax+'%'); schedule(was!==(P.leverMax>100)); }
+    else if(t.dataset.mr){ P.marginRate=(+t.value)/10; label(t, P.marginRate.toFixed(1)+'%'); schedule(); }
+    else if(t.dataset.vt){ const was=P.volTarget>0; P.volTarget=+t.value;
+      label(t, +t.value>0?('年化 '+t.value+'%'):'关'); schedule(was!==(P.volTarget>0)); }
+    else if(t.dataset.db){ P.ddBrake=+t.value; label(t, +t.value>0?('跌 '+t.value+'% 清仓'):'关'); schedule(); }
+    else if(t.dataset.ma){ P.maWin=+t.value; label(t, +t.value>0?(t.value+' 日线之上才买'):'关'); schedule(); }
+    else if(t.dataset.mh){ P.minHold=+t.value; label(t, +t.value>0?(t.value+' 个交易日'):'关'); schedule(); }
+    else if(t.dataset.cc){ P.corrCap=(+t.value)/100; label(t, +t.value>0?('相关系数 ≤ '+P.corrCap.toFixed(2)):'关'); schedule(); }
+    else if(t.dataset.aw){ const was=P.awShare>0; setShare('aw',+t.value);
+      label(t, P.awShare===0?'不用底仓':P.awShare+'%');
+      t.closest('.sld').querySelector('.wbar i').style.width=P.awShare+'%';
+      t.closest('.sld').querySelector('.sub').textContent=splitText();
+      schedule(was!==(P.awShare>0)); }
+    else if(t.dataset.tu){ const was=P.tuShare>0; setShare('tu',+t.value);
+      label(t, P.tuShare===0?'不用海龟':P.tuShare+'%');
+      t.closest('.sld').querySelector('.wbar i').style.width=P.tuShare+'%';
+      t.closest('.sld').querySelector('.sub').textContent=splitText();
+      schedule(was!==(P.tuShare>0)); }
+    else if(t.dataset.ti){ P.tuIn=+t.value; label(t,'破 '+t.value+' 日新高'); schedule(); }
+    else if(t.dataset.to){ P.tuOut=+t.value; label(t,'破 '+t.value+' 日新低'); schedule(); }
+    else if(t.dataset.ts){ P.tuStop=(+t.value)/10; label(t, P.tuStop>0?P.tuStop.toFixed(1)+' 倍 ATR':'关'); schedule(); }
+    else if(t.dataset.tr){ P.tuRisk=(+t.value)/10; label(t, P.tuRisk.toFixed(1)+'%'); schedule(); }
+  };
+  rail.onchange=e=>{
+    const t=e.target;
+    if(t.id!=='dStart'&&t.id!=='dEnd'&&t.id!=='selBench') unpick();
+    if(t.id==='absOn'){ P.absOn=t.checked; buildRail(); run(); }
+    else if(t.id==='dStart'||t.id==='dEnd'){ readDates(); }
+    else if(t.id==='selBench'){ P.bench=t.value; run(); paintPresetStats(); }
+  };
+  document.getElementById('segFreq').onclick=e=>{
+    const b=e.target.closest('button'); if(!b) return; unpick(); P.freq=b.dataset.f; buildRail(); run(); };
+  document.getElementById('segExec').onclick=e=>{
+    const b=e.target.closest('button'); if(!b) return; unpick(); P.exec=b.dataset.e; buildRail(); run(); };
+}
+const POOL_GROUPS=[
+  ['A 股', ['510880','159915','510300','510500','512100','588000']],
+  ['海外',  ['513100','513500','159920','513520','513030','162411']],
+  ['债券',  ['511010','511260','511380']],
+  ['商品',  ['518880','159985','159980','159981','501018','161226']],
+];
+const AW_LEGS=[['510300','股票'],['511010','中久期债'],['511260','长久期债'],
+               ['518880','黄金'],['501018','原油'],['513500','海外股']];
+const QUICK=[{k:'all',n:'全期'},{k:'2015',n:'2015 起'},{k:'10',n:'近 10 年'},
+             {k:'5',n:'近 5 年'},{k:'3',n:'近 3 年'},{k:'1',n:'近 1 年'}];
+let LAST=fmtD(CAL[CAL.length-1]); const FIRST=fmtD(CAL[0]);
+function quickRange(k){
+  if(k==='all') return [FIRST, LAST];
+  if(k==='2015') return ['2015-01-01', LAST];
+  const d=new Date(LAST); d.setFullYear(d.getFullYear()-(+k));
+  return [d.toISOString().slice(0,10), LAST];
+}
+function isQuick(q){ const [a,b]=quickRange(q.k); return P.start===a && P.end===b; }
+function applyQuick(k){ const [a,b]=quickRange(k); P.start=a; P.end=b; buildRail(); run(); paintPresetStats(); }
+let dtTimer=null;
+function readDates(){
+  const a=document.getElementById('dStart'), b=document.getElementById('dEnd');
+  if(!a||!b) return;
+  const clamp2=v=> v<FIRST?FIRST : v>LAST?LAST : v;
+  if(/^\d{4}-\d\d-\d\d$/.test(a.value)) P.start=clamp2(a.value);
+  if(/^\d{4}-\d\d-\d\d$/.test(b.value)) P.end=clamp2(b.value);
+  clearTimeout(dtTimer);
+  dtTimer=setTimeout(()=>{ run(); paintPresetStats();
+    document.querySelectorAll('#quickRange button').forEach((el,i)=>
+      el.setAttribute('aria-pressed', isQuick(QUICK[i]))); },160);
+}
+// 三个袖子的占比不能超过 100%，谁被顶出去就压另一个
+function setShare(which, v){
+  v=clamp(v,0,100);
+  if(which==='aw'){ P.awShare=v; if(P.awShare+P.tuShare>100) P.tuShare=100-P.awShare; }
+  else { P.tuShare=v; if(P.awShare+P.tuShare>100) P.awShare=100-P.tuShare; }
+}
+function splitText(){
+  const rot=Math.max(0,100-P.awShare-P.tuShare);
+  const parts=[]; if(rot>0) parts.push('轮动 '+rot+'%');
+  if(P.tuShare>0) parts.push('海龟 '+P.tuShare+'%');
+  if(P.awShare>0) parts.push('全天候 '+P.awShare+'%');
+  return '当前配比：'+(parts.join(' ／ ')||'—');
+}
+const WSUB={trend:'归一化收盘价回归斜率 × R²，原文的改进 2',mom:'区间涨幅，原文的初版规则',
+  rs:'区间涨幅 ÷ 同期年化波动',lowvol:'年化波动的相反数，偏好走得稳的',rev:'近期涨幅的相反数，追高时压一压'};
+// 收起状态下，每组标题右边显示这组当前是什么设置 —— 不展开也能看全配置
+function gsFactorText(){
+  const sum=Object.values(P.w).reduce((a,b)=>a+b,0);
+  const parts=Object.keys(FLAB).filter(k=>P.w[k]>0)
+    .map(k=>FSHORT[k]+' '+Math.round(P.w[k]/sum*100));
+  return (parts.join('/')||'趋势 100')+' · '+P.win.trend+' 日';
+}
+function gsRiskText(){
+  const a=[];
+  if(P.volTarget>0) a.push('波动目标 '+P.volTarget+'%');
+  if(P.leverMax>100) a.push('敞口 ≤'+P.leverMax+'%');
+  if(P.minHold>0) a.push('最短持有 '+P.minHold+' 日');
+  if(P.corrCap>0) a.push('相关 ≤'+P.corrCap.toFixed(2));
+  if(P.ddBrake>0) a.push('刹车 '+P.ddBrake+'%');
+  if(P.maWin>0) a.push(P.maWin+' 日线');
+  return a.join(' · ')||'全关';
+}
+function syncGroupSummaries(){
+  const set=(id,v)=>{ const e=document.getElementById(id); if(e) e.textContent=v; };
+  set('gsRange', P.start.slice(0,7)+' → '+P.end.slice(0,7));
+  set('gsPool',  P.pool.length+' 只 · '+P.pool.slice(0,2).map(c=>byCode[c].name).join('、')+(P.pool.length>2?' 等':''));
+  set('gsFactor', gsFactorText());
+  set('gsExec',  '持 '+P.topK+' 只 · '+({D:'日频',W:'周频',M:'月频',N:'每'+P.nDays+'日'})[P.freq]
+                 +' · '+(P.exec==='same'?'当日':'次日')+'收盘 · '+P.costBps+'bp'+(P.absOn?' · 空仓保护':''));
+  set('gsRisk',  gsRiskText());
+  set('gsTu',    P.tuShare>0 ? P.tuShare+'% · 破'+P.tuIn+'日进／'+P.tuOut+'日出' : '关');
+  set('gsAw',    P.awShare>0 ? P.awShare+'% · '+(P.awMode==='rp'?'风险平价':'等权') : '关');
+}
+const FSHORT={trend:'趋势',mom:'动量',rs:'风调',lowvol:'低波',rev:'反转'};
+
+function syncBuffer(){
+  const d=document.querySelector('[data-b]'); if(!d) return;
+  d.closest('.sld').querySelector('.sub').textContent =
+    `在手标的掉出前 ${P.topK}，但仍在前 ${P.topK+P.buffer} 名内就不换`;
+}
+function label(input, s){ const v=input.closest('.sld').querySelector('.val'); if(v) v.textContent=s; }
+function syncWeights(){
+  const wsum=Object.values(P.w).reduce((a,b)=>a+b,0);
+  document.querySelectorAll('#weights .sld').forEach(d=>{
+    const k=d.querySelector('input').dataset.w, share=wsum>0?P.w[k]/wsum:(k==='trend'?1:0);
+    d.querySelector('.val').textContent=(share*100).toFixed(0)+'%';
+    d.querySelector('.wbar i').style.width=(share*100)+'%';
+  });
+}
+
+let psKey='', PSTAT=[], presetIdx=null;
+function paintPresetStats(force){
+  const key=P.start+P.end+P.bench;
+  if(force || key!==psKey){
+    psKey=key;
+    PSTAT=PRESETS.map(pr=>{
+      if(pr.g) return {};
+      const r=backtest({...P, ...JSON.parse(JSON.stringify(pr.p))});
+      return r.err ? {c:'—',d:'—',k:'—'}
+        : {c:(r.S.cagr*100).toFixed(1), d:'−'+(r.S.mdd*100).toFixed(1), k:r.S.calmar.toFixed(2)};
+    });
+  }
+  paintExplain(); paintNow();
+  PSTAT.forEach((st,i)=>{
+    if(PRESETS[i].g) return;
+    const a=document.querySelector(`[data-f="c${i}"]`); if(!a) return;
+    a.textContent=st.c;
+    document.querySelector(`[data-f="d${i}"]`).textContent=st.d;
+    document.querySelector(`[data-f="k${i}"]`).textContent=st.k;
+  });
+}
+// 手改任何参数 → 预设不再算「已选中」
+let baseName='';
+function unpick(){
+  if(presetIdx===null) return;
+  baseName=PRESETS[presetIdx].n;
+  presetIdx=null;
+  document.querySelectorAll('.prow').forEach(b=>b.setAttribute('aria-pressed','false'));
+  document.querySelectorAll('.excard[open]').forEach(b=>b.removeAttribute('open'));
+  paintNow();
+}
+
+// 顶部：现在跑的是哪套
+function paramSummary(){
+  const rot=Math.max(0,100-P.awShare-P.tuShare);
+  const wActive=Object.entries(P.w).filter(([,v])=>v>0)
+    .map(([k,v])=>FLAB[k]+' '+Math.round(v/Object.values(P.w).reduce((a,b)=>a+b,0)*100)+'%');
+  const risk=[P.volTarget>0&&('波动目标 '+P.volTarget+'%'), P.ddBrake>0&&('回撤刹车 '+P.ddBrake+'%'),
+    P.maWin>0&&(P.maWin+' 日均线过滤'), P.minHold>0&&('最小持有 '+P.minHold+' 日'),
+    P.corrCap>0&&('相关 ≤ '+P.corrCap.toFixed(2)), P.absOn&&'趋势转负走现金'].filter(Boolean);
+  const bits=[
+    P.pool.length+' 只池子',
+    wActive.join('／')||'趋势 100%',
+    '持 '+P.topK+' 只',
+    ({D:'日频',W:'周频',M:'月频',N:'每 '+P.nDays+' 日'})[P.freq],
+    (P.tuShare>0||P.awShare>0) ? ('配比 轮动 '+rot+'／海龟 '+P.tuShare+'／全天候 '+P.awShare) : null,
+    risk.length?('风控 '+risk.join('、')):'无额外风控',
+  ].filter(Boolean);
+  return bits.join('　·　');
+}
+function paintNow(){
+  const n=document.getElementById('nowBar'); if(!n) return;
+  if(presetIdx!==null){
+    const pr=PRESETS[presetIdx];
+    n.innerHTML=`<span class="nwk">当前方案</span><span class="nwn">${pr.n}</span>
+      <span class="nwd">${pr.d}</span>
+      <button type="button" class="txtbtn" id="toExplain">看详细说明</button>`;
+  } else {
+    n.innerHTML=`<span class="nwk">当前方案</span><span class="nwn">自定义</span>
+      <span class="nwd">${baseName?`<b>改自「${baseName}」</b>　`:''}${paramSummary()}</span>
+      <button type="button" class="txtbtn" id="toExplain">看详细说明</button>`;
+  }
+  const b=document.getElementById('toExplain');
+  if(b) b.onclick=()=>document.getElementById('explainPanel').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+// 底部：十一套逐个说清
+function paintExplain(){
+  const host=document.getElementById('explain'); if(!host) return;
+  host.innerHTML=PRESETS.map((pr,i)=>{
+    if(pr.g) return `<h3 class="exg">${pr.g}</h3>`;
+    const st=PSTAT[i]||{};
+    return `<details class="excard" data-ex="${i}" ${presetIdx===i?'open':''}>
+      <summary>
+        <span class="exnm">${pr.n}</span>
+        <span class="exfig">${st.c||'·'}<i>%</i>　${st.d||'·'}<i>%</i>　${st.k||'·'}</span>
+        ${presetIdx===i?'<span class="extag">正在跑</span>'
+                       :`<button type="button" class="txtbtn" data-ap="${i}">套用</button>`}
+      </summary>
+      <div class="exb">
+        <p class="exd">${pr.d}</p>
+        <dl class="exdl">
+          <dt>想解决</dt><dd>${pr.ex.q}</dd>
+          <dt>怎么做</dt><dd>${pr.ex.h}</dd>
+          <dt>代价</dt><dd>${pr.ex.c}</dd>
+        </dl>
+      </div></details>`;
+  }).join('');
+  host.onclick=e=>{
+    const b=e.target.closest('button[data-ap]'); if(!b) return;
+    e.preventDefault(); e.stopPropagation();       // 别让「套用」顺手把这条折叠了
+    presetIdx=+b.dataset.ap;
+    Object.assign(P, JSON.parse(JSON.stringify(PRESETS[presetIdx].p)));
+    buildRail(); run();
+    document.getElementById('nowBar').scrollIntoView({behavior:'smooth',block:'start'});
+  };
+}
+
+/* ── 跑 ──────────────────────────────────────────────────────── */
+let timer=null, needRail=false;
+function schedule(rebuild){ needRail=needRail||rebuild; clearTimeout(timer); timer=setTimeout(()=>{ run(); if(needRail){buildRail(); needRail=false} },90); }
+function run(){
+  const t=performance.now();
+  const r=backtest(P);
+  const warn=document.getElementById('warn');
+  if(r.err){ warn.textContent=r.err; return; }
+  R=r;
+  const msgs=[];
+  if(R.calStart>R.reqStart) msgs.push(`受上市时间与因子窗口限制，实际从 ${fmtD(R.t0d)} 起算。`);
+  if(P.exec==='same') msgs.push('当前按「当日收盘价算信号、当日收盘价成交」，与原文一致，但实盘做不到。');
+  warn.textContent=msgs.join(' ');
+  paintStats(); drawNav(); drawBrush(); drawDD(); drawScore(); drawCorr(); drawYears();
+  paintNow(); syncGroupSummaries();   // 参数落定之后再刷一遍，摘要才是最新的
+  document.title=`ETF 轮动记录台 · 年化 ${pct(R.S.cagr,1)}`;
+}
+let rt=null;
+addEventListener('resize',()=>{ clearTimeout(rt); rt=setTimeout(()=>{ if(R){drawNav();drawBrush();drawDD();drawScore();drawCorr();drawYears()} },140); });
+
+document.getElementById('copyBtn').onclick=()=>{
+  const w=Object.entries(P.w).filter(([,v])=>v>0).map(([k,v])=>`${FLAB[k]} ${v}`).join(' / ')||'趋势 100';
+  const s=[`ETF 轮动回测 ${fmtD(R.t0d)}→${fmtD(R.t1d)}`,
+    `池：${P.pool.map(c=>byCode[c].name).join('、')}`,
+    `权重：${w}　窗口：趋势${P.win.trend}/动量${P.win.mom}/波动${P.win.vol}/反转${P.win.rev}`,
+    `持仓 Top${P.topK}　${({D:'日',W:'周',M:'月',N:'每'+P.nDays+'日'})[P.freq]}频　缓冲${P.buffer}　${P.exec==='same'?'当日':'次日'}收盘成交　成本${P.costBps}bp　${P.absOn?'趋势<'+P.absThresh+'空仓':'不空仓'}`,
+    `年化 ${pct(R.S.cagr,2)}　波动 ${pct(R.S.vol,2)}　夏普 ${num(R.S.sharpe,2)}　最大回撤 ${pct(-R.S.mdd,2)}　卡玛 ${num(R.S.calmar,2)}　累计 ${num(R.navS[R.navS.length-1],2)}×`,
+    `配比：${splitText().replace('当前配比：','')}`,
+    `风控：${[P.volTarget>0&&('波动目标'+P.volTarget+'%'), P.ddBrake>0&&('回撤刹车'+P.ddBrake+'%'), P.maWin>0&&(P.maWin+'日均线过滤'), P.minHold>0&&('最小持有'+P.minHold+'日'), P.corrCap>0&&('相关≤'+P.corrCap.toFixed(2))].filter(Boolean).join('　')||'全关'}`,
+    R.tuOn? `海龟：破 ${P.tuIn} 日新高进／破 ${P.tuOut} 日新低出／${P.tuStop>0?P.tuStop.toFixed(1)+'倍ATR止损':'不止损'}／风险预算 ${P.tuRisk.toFixed(1)}%　（只做海龟 年化 ${pct(R.tuS.cagr,2)}／回撤 ${pct(-R.tuS.mdd,2)}）` : '海龟：未启用',
+    R.awOn? `全天候：${P.awPool.map(c=>byCode[c].name).join('、')}　${P.awMode==='rp'?'风险平价':'等权'}　${({M:'每月',Q:'每季',Y:'每年'})[P.awFreq]}再平衡　（只做底仓 年化 ${pct(R.awS.cagr,2)}／回撤 ${pct(-R.awS.mdd,2)}）` : '全天候：未启用',
+    `基准 ${benchName()}：年化 ${pct(R.B.cagr,2)}　最大回撤 ${pct(-R.B.mdd,2)}`,
+    `最新持仓：${Object.keys(R.lastHold).map(c=>c===CASH?'现金':byCode[c].name).join('、')}`].join('\n');
+  navigator.clipboard.writeText(s).then(()=>{
+    const b=document.getElementById('copyBtn'), o=b.textContent; b.textContent='已复制到剪贴板';
+    setTimeout(()=>b.textContent=o,1600);
+  });
+};
+
+document.getElementById('dataEnd').textContent=fmtD(CAL[CAL.length-1]);
+// 默认套用「原文＋真实摩擦」：按名字找，别用写死的下标（加过分组标题行会错位）
+presetIdx=PRESETS.findIndex(x=>x.n==='原文＋真实摩擦');
+Object.assign(P, JSON.parse(JSON.stringify(PRESETS[presetIdx].p)));
+buildRail(); run();
+
+/* ── 开页向腾讯补拉仓库数据之后的交易日 ─────────────────────────── */
+const feed=document.getElementById('feed'), feedText=document.getElementById('feedText');
+function setFeed(state,msg){ feed.dataset.state=state; feedText.textContent=msg; }
+function cnDate(d){ return `${+d.slice(4,6)}月${+d.slice(6,8)}日`; }
+let liveBusy=false;
+async function liveUpdate(){
+  if(liveBusy || !globalThis.ETFUpdater) return; liveBusy=true;
+  const before=CAL[CAL.length-1], wasAtEnd=(P.end===LAST);
+  setFeed('busy', `行情到 ${cnDate(before)}，正在向腾讯拉取之后的交易日`);
+  try{
+    const r=await ETFUpdater.update(RAW);
+    if(r.added>0){
+      try{
+        const b=CAL.indexOf(globalThis.ETF_BASE_LAST)+1, px={};
+        for(const a of ASSETS) px[a.code]=a.px.slice(b);
+        localStorage.setItem('etf-live-delta-v1', JSON.stringify({base:globalThis.ETF_BASE_LAST, cal:CAL.slice(b), px, at:Date.now()}));
+      }catch(e){}
+      LAST=fmtD(CAL[CAL.length-1]);
+      document.getElementById('dataEnd').textContent=LAST;
+      if(wasAtEnd) P.end=LAST;
+      buildRail(); run(); paintPresetStats(true);
+      setFeed('fresh', `行情到 ${cnDate(r.last)}，刚从腾讯补了 ${r.added} 个交易日`);
+    }else{
+      setFeed('fresh', `行情到 ${cnDate(before)}，已是最新。交易日 17:00 后才有当天收盘`);
+    }
+  }catch(e){
+    setFeed('fail', `行情到 ${cnDate(before)}，没连上腾讯行情，用的是已存的数据`);
+  }
+  liveBusy=false;
+}
+document.getElementById('feedBtn').onclick=liveUpdate;
+setFeed('', `行情到 ${cnDate(CAL[CAL.length-1])}`);
+liveUpdate();
+</script>
+</body>
+</html>

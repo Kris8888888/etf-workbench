@@ -1,0 +1,7 @@
+.DS_Store
+_src/*.png
+_src/new_*.json
+_src/recon_new.json
+_src/legacy/*.html
+_src/article2.txt
+_src/*.log
