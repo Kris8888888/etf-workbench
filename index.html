@@ -345,6 +345,9 @@ table.data tfoot td{font-weight:500; border-top:1px solid var(--ink-2); border-b
 .feed span{flex:1 1 auto}
 .feed button{appearance:none; border:0; background:none; padding:0; font:inherit; font-size:11.5px; color:var(--ink-2); text-decoration:underline; text-underline-offset:2px; cursor:pointer; white-space:nowrap; flex:none}
 .feed button:hover{color:var(--ink)}
+.feed button+button{margin-left:4px}
+.feed[data-intra="1"] #intraBtn{color:var(--vermilion)}
+.feed[data-intra="1"] i{background:var(--vermilion); animation:feedPulse 1.6s ease-in-out infinite}
 .feed button:focus-visible{outline:2px solid var(--vermilion); outline-offset:1px}
 .feed[data-state=busy] button{visibility:hidden}
 @keyframes feedPulse{50%{opacity:.25}}
@@ -358,7 +361,7 @@ table.data tfoot td{font-weight:500; border-top:1px solid var(--ink-2); border-b
     <div class="mark">
       <h1>ETF轮动记录台</h1>
       <p>在一池ETF里每期只留最强的那几个。左边改权重和区间，右边的净值、回撤、轮动轨迹立刻重算。</p>
-      <p class="feed" id="feed"><i></i><span id="feedText"></span><button type="button" id="feedBtn">重新拉取</button></p>
+      <p class="feed" id="feed"><i></i><span id="feedText"></span><button type="button" id="feedBtn">重新拉取</button><button type="button" id="intraBtn">盘中信号</button></p>
     </div>
     <div class="signal">
       <div class="swatches" id="sigSwatch"></div>
@@ -558,6 +561,7 @@ table.data tfoot td{font-weight:500; border-top:1px solid var(--ink-2); border-b
 "use strict";
 const RAW = globalThis.ETF_DATA;
 const CAL = RAW.cal, ASSETS = RAW.assets;
+const INTRA={mode:false, on:false, date:null, at:null, timer:null};   // 盘中信号状态（定义在最前，run() 里会读）
 const SERIES = ['--s1','--s2','--s3','--s4','--s5','--s6','--s7','--s8'].map(v=>
   getComputedStyle(document.documentElement).getPropertyValue(v).trim());
 const CSS = k => getComputedStyle(document.documentElement).getPropertyValue(k).trim();
@@ -1797,7 +1801,9 @@ function paintStats(){
   document.getElementById('sigWho').innerHTML=(shown.map(c=>
     `<span>${c===CASH?'现金':byCode[c].name}${multi?` <small style="font-size:.55em;color:var(--ink-3)">${(merged[c]*100).toFixed(0)}%</small>`:''}</span>`).join('')
     + (order.length>4?`<span style="font-size:.6em;color:var(--ink-3)">另有 ${order.length-4} 项共 ${(restW*100).toFixed(0)}%</span>`:''))||'—';
-  document.getElementById('sigCap').textContent=`${fmtD(R.t1d)} 收盘后该持有`;
+  document.getElementById('sigCap').textContent = (INTRA.on && R.t1d===INTRA.date)
+    ? `${fmtD(R.t1d)} ${INTRA.at} 盘中 · 按此刻价格该持有`
+    : `${fmtD(R.t1d)} 收盘后该持有`;
   const top=R.board[0];
   document.getElementById('sigMeta').textContent = multi
     ? splitText().replace('当前配比：','')
@@ -1918,7 +1924,7 @@ function buildRail(){
       <input type="range" min="0" max="3" step="1" value="${P.buffer}" data-b="1"></div>
     <div class="fld"><label>成交时点</label>
       <div class="seg" id="segExec">
-        <button type="button" data-e="same" aria-pressed="${P.exec==='same'}">当日收盘</button>
+        <button type="button" data-e="same" aria-pressed="${P.exec==='same'}">当日收盘（≈14:30 盘中）</button>
         <button type="button" data-e="next" aria-pressed="${P.exec==='next'}">次日收盘</button>
       </div></div>`;
 
@@ -2312,7 +2318,8 @@ function run(){
   R=r;
   const msgs=[];
   if(R.calStart>R.reqStart) msgs.push(`受上市时间与因子窗口限制，实际从 ${fmtD(R.t0d)} 起算。`);
-  if(P.exec==='same') msgs.push('当前按「当日收盘价算信号、当日收盘价成交」，与原文一致，但实盘做不到。');
+  if(P.exec==='same') msgs.push('当前按「当日收盘价算信号、当日收盘价成交」。实盘对应的做法是每天 14:30 前后开「盘中信号」，按实时价算出的持仓立刻下单，尾盘半小时的价差被忽略。');
+  else if(INTRA.on) msgs.push('你在看盘中信号，但这套方案按「次日收盘成交」回测；14:30 照信号下单，更贴近的口径是「当日收盘」。');
   warn.textContent=msgs.join(' ');
   paintStats(); drawNav(); drawBrush(); drawDD(); drawScore(); drawCorr(); drawYears();
   paintNow(); syncGroupSummaries();   // 参数落定之后再刷一遍，摘要才是最新的
@@ -2353,6 +2360,7 @@ function cnDate(d){ return `${+d.slice(4,6)}月${+d.slice(6,8)}日`; }
 let liveBusy=false;
 async function liveUpdate(){
   if(liveBusy || !globalThis.ETFUpdater) return; liveBusy=true;
+  dropIntra();
   const before=CAL[CAL.length-1], wasAtEnd=(P.end===LAST);
   setFeed('busy', `行情到 ${cnDate(before)}，正在向腾讯拉取之后的交易日`);
   try{
@@ -2375,7 +2383,92 @@ async function liveUpdate(){
     setFeed('fail', `行情到 ${cnDate(before)}，没连上腾讯行情，用的是已存的数据`);
   }
   liveBusy=false;
+  if(INTRA.mode) intraRefresh();
 }
+
+/* ── 盘中信号：每天 14:30 前后按实时价当「今天的临时收盘」，算出今天该持有什么 ──
+ * 仓库和腾讯日线都只有收盘价，盘后才能算，来不及操作。这里用 qt.gtimg.cn 的实时报价
+ * （现价 / 昨收）推出今天到此刻的收益，接在净值序列末尾当临时的一天，跑一遍策略。
+ * 临时的一天不会存进 localStorage；17:00 后「重新拉取」拿到真正的收盘会把它替换掉。*/
+const SYMQ = c => (c[0]==='5' ? 'sh' : 'sz') + c;
+function bjNow(){ return new Date(Date.now()+8*3600e3); }          // 用 UTC 取值 = 北京时间
+function bjHM(){ const d=bjNow(); return d.getUTCHours()*60+d.getUTCMinutes(); }
+function isTradingNow(){ const d=bjNow(), w=d.getUTCDay(), m=bjHM(); return w>=1&&w<=5&&m>=9*60+30&&m<=15*60; }
+function quoteAll(){
+  return new Promise((res,rej)=>{
+    const sc=document.createElement('script'); sc.charset='gbk';
+    sc.src='https://qt.gtimg.cn/q='+ASSETS.map(a=>SYMQ(a.code)).join(',')+'&r='+Date.now();
+    const t=setTimeout(()=>{ sc.remove(); rej(new Error('timeout')); },15000);
+    sc.onload=()=>{ clearTimeout(t); sc.remove(); const out={};
+      for(const a of ASSETS){ const k='v_'+SYMQ(a.code), v=window[k]; if(typeof v!=='string') continue; delete window[k];
+        const f=v.split('~'); if(f.length<32) continue;
+        out[a.code]={price:+f[3], prev:+f[4], stamp:f[30]||''}; }
+      Object.keys(out).length? res(out) : rej(new Error('empty')); };
+    sc.onerror=()=>{ clearTimeout(t); sc.remove(); rej(new Error('network')); };
+    document.head.appendChild(sc);
+  });
+}
+function dropIntra(){
+  if(!INTRA.on) return;
+  const wasAtEnd=(P.end===LAST);
+  CAL.pop(); for(const a of ASSETS) a.px.pop();
+  INTRA.on=false; INTRA.date=null;
+  LAST=fmtD(CAL[CAL.length-1]); if(wasAtEnd) P.end=LAST;
+  document.getElementById('dataEnd').textContent=LAST;
+}
+function pushIntra(date,q,at){
+  const wasAtEnd=(P.end===LAST);
+  CAL.push(date);
+  for(const a of ASSETS){
+    const last=a.px[a.px.length-1], x=q[a.code];
+    const r=(x && x.prev>0 && x.price>0)? x.price/x.prev-1 : 0;   // 拿不到报价的当日不动
+    a.px.push(last>0? +(last*(1+r)).toFixed(6) : 0);
+  }
+  INTRA.on=true; INTRA.date=date; INTRA.at=at;
+  LAST=fmtD(date); if(wasAtEnd) P.end=LAST;
+  document.getElementById('dataEnd').textContent=LAST+'（盘中）';
+}
+const intraBtn=document.getElementById('intraBtn');
+let intraBusy=false;
+async function intraRefresh(){
+  if(intraBusy || liveBusy || !INTRA.mode) return; intraBusy=true;
+  try{
+    const q=await quoteAll();
+    const stamps=Object.values(q).map(x=>x.stamp).filter(x=>/^\d{12}/.test(x)).sort();
+    const st=stamps[stamps.length-1] || '';
+    const qdate = st? st.slice(0,8) : (d=>`${d.getUTCFullYear()}${String(d.getUTCMonth()+1).padStart(2,'0')}${String(d.getUTCDate()).padStart(2,'0')}`)(bjNow());
+    const at = st? `${st.slice(8,10)}:${st.slice(10,12)}` : `${String(bjNow().getUTCHours()).padStart(2,'0')}:${String(bjNow().getUTCMinutes()).padStart(2,'0')}`;
+    const firstTime=!INTRA.on;
+    dropIntra();
+    if(qdate<=CAL[CAL.length-1]){
+      run();
+      setFeed('fresh', `${cnDate(qdate)}的收盘已经在库里，直接看上面的「收盘后该持有」`);
+    }else{
+      pushIntra(qdate,q,at);
+      run(); if(firstTime) paintPresetStats(true);
+      const left=14*60+30-bjHM();
+      const n=Object.keys(q).length;
+      setFeed('fresh', `盘中 ${at} · 按 ${n} 只的实时价算出今天该持有${isTradingNow()? (left>0? `，距 14:30 还有 ${left} 分钟，到点再刷一次照着调` : '，已过 14:30，照上面调仓即可') : '。现在不是交易时段，显示的是最后一口价'}`);
+    }
+  }catch(e){
+    setFeed('fail', '没拿到腾讯实时报价，盘中信号暂时算不了，稍后再点一次');
+  }
+  intraBusy=false;
+}
+function setIntraMode(on){
+  INTRA.mode=on; feed.dataset.intra=on?'1':'';
+  intraBtn.textContent = on? '退出盘中' : '盘中信号';
+  clearInterval(INTRA.timer); INTRA.timer=null;
+  if(on){
+    intraRefresh();
+    INTRA.timer=setInterval(()=>{ if(isTradingNow() && document.visibilityState==='visible') intraRefresh(); }, 60e3);
+  }else{
+    dropIntra(); run(); paintPresetStats(true);
+    setFeed('', `行情到 ${cnDate(CAL[CAL.length-1])}`);
+  }
+}
+intraBtn.onclick=()=>setIntraMode(!INTRA.mode);
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible' && INTRA.mode && isTradingNow()) intraRefresh(); });
 document.getElementById('feedBtn').onclick=liveUpdate;
 setFeed('', `行情到 ${cnDate(CAL[CAL.length-1])}`);
 liveUpdate();
